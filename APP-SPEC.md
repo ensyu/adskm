@@ -641,15 +641,32 @@ Rejection: Any ID not matching format
 
 **Path Traversal Prevention (CRITICAL):**
 - Reject any ID containing: `..`, `./`, `~`, symlinks, path separators (`\`, `/`)
-- Implementation: Normalize paths using `pathlib.Path.resolve()`
-- Symlink detection (mandatory): After resolve(), iterate through path components to detect symlinks
+- Implementation: Two-stage validation
+
+  **Stage 1: Symlink Detection (BEFORE resolve):**
   ```python
   import pathlib
-  resolved_path = pathlib.Path(knowledge_id).resolve()
-  for part in resolved_path.parts:
-    if pathlib.Path(part).is_symlink():
-      raise ValueError('Path contains symlink; rejected')
+
+  # Check each path component for symlinks BEFORE resolution
+  path_obj = pathlib.Path(knowledge_id)
+  current = pathlib.Path(knowledge_base_root)  # knowledge/ directory
+
+  for component in path_obj.parts:
+    current = current / component
+    if current.is_symlink():
+      raise ValueError(f'Path component is symlink: {component}')
   ```
+
+  **Stage 2: Path Normalization & Boundary Check:**
+  ```python
+  # Normalize path and verify it stays within knowledge/ directory
+  resolved = current.resolve()
+  knowledge_root_resolved = pathlib.Path(knowledge_base_root).resolve()
+
+  if not str(resolved).startswith(str(knowledge_root_resolved)):
+    raise ValueError('Path escapes knowledge/ directory boundary')
+  ```
+
 - Validation: Confirm all file operations stay within `knowledge/` directory
 - Cross-platform: Works on Windows + Unix/Linux
 
@@ -676,6 +693,48 @@ Rejection: Any ID not matching format
   - Raise error if invalid UTF-8 found; do not save partial records
 - Whitespace: Normalize CRLF to LF; trim leading/trailing spaces
   - Implementation: `text.replace('\r\n', '\n').strip()`
+
+**Pydantic Validator Implementation:**
+```python
+from pydantic import BaseModel, field_validator
+
+class ContentModel(BaseModel):
+  title: str
+  summary: str
+  approval_comment: str = None
+  evidence_notes: str = None
+
+  @field_validator('title', 'summary', 'approval_comment', 'evidence_notes', mode='before')
+  @classmethod
+  def sanitize_strings(cls, v):
+    if v is None:
+      return None
+
+    if not isinstance(v, str):
+      raise ValueError('Field must be string')
+
+    # 1. Check UTF-8 validity
+    try:
+      v.encode('utf-8', errors='strict')
+    except UnicodeEncodeError:
+      raise ValueError('Invalid UTF-8 sequence in field')
+
+    # 2. Normalize line endings
+    v = v.replace('\r\n', '\n')
+
+    # 3. Remove control characters (0x00-0x08, 0x0B-0x0C, 0x0E-0x1F)
+    control_chars = (
+      list(range(0x00, 0x09)) +           # 0x00-0x08
+      [0x0B, 0x0C] +                      # 0x0B-0x0C
+      list(range(0x0E, 0x20))             # 0x0E-0x1F
+    )
+    v = ''.join(c for c in v if ord(c) not in control_chars)
+
+    # 4. Trim spaces
+    v = v.strip()
+
+    return v
+```
 
 **Implementation:**
 ```python

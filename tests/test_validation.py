@@ -116,25 +116,6 @@ class TestPathSafety:
                 # Skip on systems that don't support symlinks
                 pytest.skip("Symlinks not supported on this system")
 
-    def test_path_boundary_check(self):
-        """Paths should stay within boundary."""
-        import tempfile
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            base = Path(tmpdir) / "knowledge"
-            base.mkdir()
-
-            # In-boundary path
-            in_path = base / "record.yaml"
-            is_safe, error = SchemaValidator.check_path_boundary(in_path, base)
-            assert is_safe
-
-            # Out-of-boundary path
-            out_path = Path(tmpdir) / "../../etc/passwd"
-            is_safe, error = SchemaValidator.check_path_boundary(out_path, base)
-            assert not is_safe
-
-
 class TestEvidenceValidator:
     """Test evidence quality validation."""
 

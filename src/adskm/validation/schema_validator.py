@@ -85,23 +85,6 @@ class SchemaValidator:
         return True, ""
 
     @staticmethod
-    def check_path_boundary(file_path: Path, base_dir: Path) -> tuple[bool, str]:
-        """Verify resolved path stays within base directory.
-
-        Returns: (is_safe, error_message)
-        """
-        try:
-            resolved = file_path.resolve()
-            base_resolved = base_dir.resolve()
-
-            if not str(resolved).startswith(str(base_resolved)):
-                return False, f"Path escapes boundary: {file_path}"
-        except Exception as e:
-            return False, f"Error resolving path: {e}"
-
-        return True, ""
-
-    @staticmethod
     def validate_version_format(version: str) -> tuple[bool, str]:
         """Validate semantic version format: MAJOR.MINOR.PATCH.
 

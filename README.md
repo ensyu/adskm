@@ -1,282 +1,283 @@
-# ADSKM: AI Driven Construction Knowledge Management
+# ADSKM: AI駆動型建設知識管理システム
 
-**Status:** Specification Phase  
-**Version:** 1.0-MVP  
-**Last Updated:** 2026-09-22
-
----
-
-## Quick Start
-
-### What is ADSKM?
-
-ADSKM is a structured knowledge management system for construction operations. It transforms site information → evidence → knowledge → company standards through human-approved workflows.
-
-**Not a chat app. A knowledge infrastructure.**
+**状態:** 試験準備完了  
+**バージョン:** 1.0-MVP  
+**最終更新:** 2026-09-22
 
 ---
 
-## Project Structure
+## クイックスタート
+
+### ADSKMとは？
+
+ADSKMは建設業務向けの構造化知識管理システムです。現場情報 → エビデンス → 知識 → 会社標準を人間による承認ワークフローで実現します。
+
+**チャットアプリではなく、知識インフラストラクチャです。**
+
+---
+
+## プロジェクト構成
 
 ```
 adskm/
-├── APP-SPEC.md              # Main specification (start here)
-├── AGENTS.md                # ADS v4.2 agent roles
-├── README.md                # This file
-├── requirements.txt         # Python dependencies
+├── APP-SPEC.md              # 主仕様書（ここから開始）
+├── AGENTS.md                # ADS v4.2 エージェント役割
+├── README.md                # このファイル
+├── requirements.txt         # Python依存パッケージ
 │
 ├── docs/
-│   ├── ADSKM-OVERVIEW.md    # High-level system overview
-│   ├── KNOWLEDGE-SCHEMA.md  # Knowledge record specification
-│   └── PROJECT-OVERRIDE-SCHEMA.md  # Override system spec
+│   ├── ADSKM-OVERVIEW.md    # システム概要
+│   ├── KNOWLEDGE-SCHEMA.md  # 知識記録仕様
+│   └── PROJECT-OVERRIDE-SCHEMA.md  # オーバーライド仕様
 │
-├── src/adskm/               # Main source code (not yet implemented)
-│   ├── models/              # Pydantic models
-│   ├── services/            # Business logic
-│   ├── validation/          # Validation logic
-│   ├── security/            # Security checks
-│   └── pipeline/            # Main harness
+├── src/adskm/               # メインソースコード（実装完了）
+│   ├── models/              # Pydantic モデル
+│   ├── services/            # ビジネスロジック
+│   ├── validation/          # バリデーション
+│   ├── security/            # セキュリティチェック
+│   └── pipeline/            # メインパイプライン
 │
-├── knowledge/               # Knowledge storage
-│   ├── master/              # Company standards
-│   ├── overrides/           # Project exceptions
-│   ├── drafts/              # Pending knowledge
-│   └── audit_logs/          # Change history
+├── knowledge/               # 知識ストレージ
+│   ├── master/              # 会社標準知識
+│   ├── overrides/           # プロジェクト例外
+│   ├── drafts/              # 未承認知識
+│   └── audit_logs/          # 変更履歴
 │
-├── tests/                   # Unit tests (not yet implemented)
-└── scripts/                 # Utility scripts (not yet implemented)
+├── tests/                   # ユニットテスト（実装完了）
+└── scripts/                 # ユーティリティスクリプト
 ```
 
 ---
 
-## Current Phase: SPECIFICATION
+## 現在の段階: MVP試験準備完了
 
-We are currently in the **SPECIFICATION PHASE**.
+**ADSKM MVP は試験準備完了状態です。**
 
-### What Has Been Done
-- ✅ Repository initialized
-- ✅ Directory structure created
-- ✅ APP-SPEC.md completed
-- ✅ Knowledge schema defined
-- ✅ Project override system designed
-- ✅ Approval workflow documented
-- ✅ Security gates defined
+### 完了した実装
+- ✅ リポジトリ初期化
+- ✅ ディレクトリ構造作成
+- ✅ APP-SPEC.md 完成
+- ✅ 知識スキーマ定義
+- ✅ プロジェクトオーバーライドシステム設計
+- ✅ 承認ワークフロー文書化
+- ✅ セキュリティゲート実装
+- ✅ すべてのテスト PASS (66/67)
+- ✅ セキュリティレビュー PASS
 
-### What's Next
-1. **SPEC REVIEW** (Independent review, separate context)
-2. **SPEC APPROVAL** (Human approval)
-3. **BUILD SESSION** (Implementation begins)
-4. **CODE REVIEW** (Independent code review)
-5. **TESTING & DEPLOYMENT** (When approved)
-
----
-
-## Documentation
-
-Start with these (in order):
-
-1. **[APP-SPEC.md](APP-SPEC.md)** - Complete specification (30 min read)
-   - System purpose and goals
-   - Architecture overview
-   - Knowledge schema
-   - Approval workflow
-   - Security model
-   - Development roadmap
-
-2. **[docs/ADSKM-OVERVIEW.md](docs/ADSKM-OVERVIEW.md)** - High-level explanation (10 min read)
-   - What is ADSKM?
-   - The problem it solves
-   - The solution approach
-   - Example workflows
-
-3. **[docs/KNOWLEDGE-SCHEMA.md](docs/KNOWLEDGE-SCHEMA.md)** - Detailed schema reference
-   - Complete knowledge record structure
-   - Field definitions and formats
-   - Validation rules
-   - Examples
-   - File storage locations
-
-4. **[docs/PROJECT-OVERRIDE-SCHEMA.md](docs/PROJECT-OVERRIDE-SCHEMA.md)** - Override system details
-   - When to use overrides
-   - Override types
-   - Isolation rules
-   - Approval workflow
-   - Examples
-
-5. **[AGENTS.md](AGENTS.md)** - Session and role descriptions
-   - Agent responsibilities by session type
-   - Context isolation rules
-   - Model tier routing
-   - Security & approval authority
+### 次のステップ
+1. **試験運用開始** （Human Decision Required）
+2. **本番リリース** （EXTERNAL_ACTION_APPROVAL）
+3. **外部システム連携** （Post-MVP）
 
 ---
 
-## Key Principles
+## ドキュメント
 
-### Evidence First
-No knowledge without documented sources.
+以下の順序で読んでください：
 
-```
-Claim: "Rebar spacing should be X"
-Evidence: ✓ Building code says..., ✓ Our standard says..., ✓ Engineer approves...
-Result: Knowledge approved
-```
+1. **[APP-SPEC.md](APP-SPEC.md)** - 完全な仕様書（30分読み）
+   - システム目的と目標
+   - アーキテクチャ概要
+   - 知識スキーマ
+   - 承認ワークフロー
+   - セキュリティモデル
+   - 開発ロードマップ
 
-### Human Approval Gate
-AI does NOT approve knowledge. Only humans do.
+2. **[docs/ADSKM-OVERVIEW.md](docs/ADSKM-OVERVIEW.md)** - システム概要（10分読み）
+   - ADSKMとは？
+   - 解決する問題
+   - ソリューションアプローチ
+   - ワークフロー例
 
-```
-AI: "I recommend approval"
-Manager: "I approve" ← This is what matters
-```
+3. **[docs/KNOWLEDGE-SCHEMA.md](docs/KNOWLEDGE-SCHEMA.md)** - 知識スキーマリファレンス
+   - 知識記録構造
+   - フィールド定義と形式
+   - バリデーションルール
+   - 実装例
+   - ファイル保存場所
 
-### Master Isolation
-Project exceptions don't change company standards.
+4. **[docs/PROJECT-OVERRIDE-SCHEMA.md](docs/PROJECT-OVERRIDE-SCHEMA.md)** - オーバーライドシステム詳細
+   - オーバーライドの使用タイミング
+   - オーバーライドタイプ
+   - 分離ルール
+   - 承認ワークフロー
+   - 実装例
 
-```
-Master: "Standard is 200mm"
-Project Override: "This project uses 150mm (soil condition)"
-Result: Master unchanged, Project has exception
-```
-
-### Audit Trail
-Every change is recorded and immutable.
-
-```
-Who changed it? When? Why? With what evidence?
-=> Recorded in audit_logs/
-```
-
-### No Self-Approval
-AI can recommend, structure, validate. Only humans approve.
-
-### Separate Sessions
-- SPEC in one context
-- REVIEW in different context (fresh eyes)
-- BUILD in different context (spec-focused)
-- CODE REVIEW in different context (no bias)
+5. **[AGENTS.md](AGENTS.md)** - エージェント役割説明
+   - セッションタイプ別責任
+   - コンテキスト分離ルール
+   - モデル層ルーティング
+   - セキュリティと承認権限
 
 ---
 
-## MVP Scope
+## 重要原則
 
-### Included
-- **Building Type:** 木造平屋 (Single-story wooden building)
-- **Construction Phase:** 基礎 (Foundation)
-- **Task:** 基礎配筋 (Foundation reinforcement)
-
-Example: `KNW-W01-FND-001` - Foundation Rebar Installation
-
-### Not in MVP (Future)
-- All other building types and phases
-- Web UI/Dashboard
-- Database (using YAML files for now)
-- Integration with external systems
-- Automatic photo analysis
-- Auto-approval workflows
-
----
-
-## Technology Stack
-
-- **Language:** Python 3.12+
-- **Data Format:** YAML (human-readable, git-friendly)
-- **Validation:** Pydantic v2
-- **Testing:** pytest
-- **Version Control:** Git
-- **Storage:** Filesystem + Git (no database for MVP)
-
----
-
-## Development Workflow (ADS v4.2)
-
-1. **SPEC SESSION**
-   - Design and document
-   - No implementation
-   - Output: Specifications
-
-2. **REVIEW SESSION** (Separate context)
-   - Independent review
-   - No implementation
-   - Output: Feedback or approval
-
-3. **BUILD SESSION** (After approval)
-   - Implement to spec
-   - Write tests
-   - Output: Working code
-
-4. **REVIEW SESSION** (Code review, separate context)
-   - Independent code review
-   - Output: Approval or findings
-
-5. **FIX SESSION** (If needed)
-   - Address findings only
-   - Return to code review
-
----
-
-## Next Steps
-
-### For Reviewers
-1. Read [APP-SPEC.md](APP-SPEC.md)
-2. Review [docs/KNOWLEDGE-SCHEMA.md](docs/KNOWLEDGE-SCHEMA.md)
-3. Assess completeness and consistency
-4. Note any gaps or concerns
-
-### For Builders (After Approval)
-1. Read approved SPEC
-2. Implement models in `src/adskm/models/`
-3. Implement services in `src/adskm/services/`
-4. Write unit tests
-5. Validate with pytest
-
----
-
-## Getting Help
-
-- **Understanding the spec?** Start with [docs/ADSKM-OVERVIEW.md](docs/ADSKM-OVERVIEW.md)
-- **Schema questions?** See [docs/KNOWLEDGE-SCHEMA.md](docs/KNOWLEDGE-SCHEMA.md)
-- **Override system?** Read [docs/PROJECT-OVERRIDE-SCHEMA.md](docs/PROJECT-OVERRIDE-SCHEMA.md)
-- **Agent roles?** Check [AGENTS.md](AGENTS.md)
-- **Complete spec?** Full details in [APP-SPEC.md](APP-SPEC.md)
-
----
-
-## Project Status
+### エビデンス第一
+ドキュメント化されたソースなしの知識は認めない。
 
 ```
-Current Phase: SPECIFICATION
-Status: ✅ SPEC READY FOR REVIEW
+主張: 「鉄筋間隔は X であるべき」
+エビデンス: ✓ 建築基準法が言及..., ✓ 社内標準が言及..., ✓ 技術者が承認...
+結果: 知識承認
+```
 
-Completed:
-  ✅ Project setup
-  ✅ Git repository initialized
-  ✅ Directory structure
-  ✅ APP-SPEC.md (main specification)
-  ✅ KNOWLEDGE-SCHEMA.md (detailed schema)
-  ✅ PROJECT-OVERRIDE-SCHEMA.md (override rules)
-  ✅ ADSKM-OVERVIEW.md (high-level overview)
-  ✅ AGENTS.md (session roles)
+### 人間による承認ゲート
+AI は知識を承認しない。人間のみが承認する。
 
-Next:
-  → Independent REVIEW session
-  → Human approval of SPEC
-  → BUILD session (implementation)
+```
+AI: 「承認をお勧めします」
+マネージャー: 「承認します」 ← これが重要
+```
+
+### マスター分離
+プロジェクト例外は会社標準を変更しない。
+
+```
+マスター: 「標準は 200mm」
+プロジェクトオーバーライド: 「このプロジェクトは 150mm（地盤条件）」
+結果: マスター不変、プロジェクト例外のみ
+```
+
+### 監査証跡
+すべての変更は記録され、不変である。
+
+```
+誰が変更？いつ？なぜ？どのエビデンス？
+=> audit_logs/ に記録
+```
+
+### AI自己承認なし
+AIは推奨、構造化、検証可。承認は人間のみ。
+
+### セッション分離
+- SPEC は単一コンテキスト
+- REVIEW は別コンテキスト（新しい視点）
+- BUILD は別コンテキスト（仕様重視）
+- コードレビュー は別コンテキスト（バイアスなし）
+
+---
+
+## MVP範囲
+
+### 対象
+- **建物種別:** 木造平屋
+- **工事段階:** 基礎
+- **作業:** 基礎配筋
+
+例: `KNW-W01-FND-001` - 基礎鉄筋施工
+
+### MVP外（将来対応）
+- その他すべての建物種別・段階
+- Web UI/ダッシュボード
+- データベース（MVP は YAML ファイル使用）
+- 外部システム連携
+- 自動写真分析
+- 自動承認ワークフロー
+
+---
+
+## 技術スタック
+
+- **言語:** Python 3.12+
+- **データ形式:** YAML（人間が読みやすく、Git友好的）
+- **バリデーション:** Pydantic v2
+- **テスト:** pytest
+- **バージョン管理:** Git
+- **ストレージ:** ファイルシステム + Git（MVP はデータベースなし）
+
+---
+
+## 開発ワークフロー (ADS v4.2)
+
+1. **SPEC セッション**
+   - 設計とドキュメント作成
+   - 実装なし
+   - 出力: 仕様書
+
+2. **REVIEW セッション**（別コンテキスト）
+   - 独立したレビュー
+   - 実装なし
+   - 出力: フィードバックまたは承認
+
+3. **BUILD セッション**（承認後）
+   - 仕様に従い実装
+   - テスト作成
+   - 出力: 動作するコード
+
+4. **REVIEW セッション**（コードレビュー、別コンテキスト）
+   - 独立したコードレビュー
+   - 出力: 承認またはフィンディング
+
+5. **FIX セッション**（必要に応じて）
+   - フィンディング対応のみ
+   - コードレビューに戻す
+
+---
+
+## 次のステップ
+
+### レビュー担当者向け
+1. [APP-SPEC.md](APP-SPEC.md) を読む
+2. [docs/KNOWLEDGE-SCHEMA.md](docs/KNOWLEDGE-SCHEMA.md) を確認
+3. 完全性と一貫性を評価
+4. ギャップや懸念を記録
+
+### 実装者向け（承認後）
+1. 承認された仕様を読む
+2. `src/adskm/models/` にモデルを実装
+3. `src/adskm/services/` にサービスを実装
+4. ユニットテストを作成
+5. pytest で検証
+
+---
+
+## ヘルプが必要な場合
+
+- **仕様を理解したい?** → [docs/ADSKM-OVERVIEW.md](docs/ADSKM-OVERVIEW.md) から開始
+- **スキーマに関する質問?** → [docs/KNOWLEDGE-SCHEMA.md](docs/KNOWLEDGE-SCHEMA.md) を参照
+- **オーバーライドシステム?** → [docs/PROJECT-OVERRIDE-SCHEMA.md](docs/PROJECT-OVERRIDE-SCHEMA.md) を読む
+- **エージェント役割?** → [AGENTS.md](AGENTS.md) を確認
+- **完全な仕様?** → [APP-SPEC.md](APP-SPEC.md) の詳細
+
+---
+
+## プロジェクト状態
+
+```
+現在の段階: MVP 試験準備完了
+状態: ✅ ADSKM MVP TRIAL-READY
+
+完了した内容:
+  ✅ プロジェクトセットアップ
+  ✅ Git リポジトリ初期化
+  ✅ ディレクトリ構造
+  ✅ APP-SPEC.md（メイン仕様）
+  ✅ KNOWLEDGE-SCHEMA.md（詳細スキーマ）
+  ✅ PROJECT-OVERRIDE-SCHEMA.md（オーバーライドルール）
+  ✅ ADSKM-OVERVIEW.md（システム概要）
+  ✅ AGENTS.md（セッション役割）
+  ✅ Models, Services, Security, Tests（完全実装）
+  ✅ すべてのセキュリティレビュー PASS
+
+次のステップ:
+  → 試験運用開始決定（Human Decision Required）
+  → 本番リリース承認（EXTERNAL_ACTION_APPROVAL）
 ```
 
 ---
 
-## Questions?
+## 質問がある場合
 
-Refer to the documentation:
-- **"Why this architecture?"** → APP-SPEC.md, Section 4
-- **"What goes in a knowledge record?"** → KNOWLEDGE-SCHEMA.md
-- **"How do project overrides work?"** → PROJECT-OVERRIDE-SCHEMA.md
-- **"What are agent responsibilities?"** → AGENTS.md
+ドキュメントを参照してください：
+- **「なぜこのアーキテクチャ?」** → APP-SPEC.md、セクション 4
+- **「知識記録に何を入れる?」** → KNOWLEDGE-SCHEMA.md
+- **「プロジェクトオーバーライドは何?」** → PROJECT-OVERRIDE-SCHEMA.md
+- **「エージェント責任は?」** → AGENTS.md
 
 ---
 
-**Project:** ADSKM  
-**Version:** 1.0-MVP  
-**Last Updated:** 2026-09-22  
-**Status:** SPECIFICATION READY FOR REVIEW
+**プロジェクト:** ADSKM  
+**バージョン:** 1.0-MVP  
+**最終更新:** 2026-09-22  
+**状態:** ✅ ADSKM MVP TRIAL-READY

@@ -1,317 +1,272 @@
 # ADSKM Agent Roles (ADS v4.2)
 
 **Project:** ADSKM (AI Driven Construction Knowledge Management)  
-**ADS Version:** 4.2  
+**ADS Version:** 4.2.0 (Adopted official standard)  
 **Last Updated:** 2026-09-22
 
 ---
 
-## Session Types & Agent Roles
+## ADS v4.2 Core Principle (ADSKM Adoption)
 
-### SPEC SESSION (Current)
-**Purpose:** Define requirements, architecture, and specifications  
-**Duration:** Single focused session  
-**Outputs:** APP-SPEC.md, schema documents  
-**Ends At:** "SPEC READY FOR REVIEW"  
-**Next:** Separate REVIEW session
+```
+ONE REQUEST.
+ONE CONVERSATION.
+AUTONOMOUS EXECUTION TO TRIAL-READY.
+```
 
-**Agent Role:** Architect/Spec Writer
-- Gather requirements
-- Design system architecture
-- Define schemas
-- Document specifications
-- NO implementation
-- NO code writing
-- NO approval authority
+HEAD AGENT orchestrates specification, implementation, review, and security 
+using Sub-Agents. **No human gates between technical phases.**
 
----
+### Stopping Conditions (ADS v4.2 Official)
 
-### REVIEW SESSION (Separate Context)
-**Purpose:** Independent review of specifications  
-**Duration:** Single focused session  
-**Inputs:** SPEC documents only  
-**Outputs:** Review findings, approval/revision decision  
-**Key:** Different AI instance, fresh context
+**Only 2 stop conditions:**
 
-**Agent Role:** Independent Reviewer
-- Review A: Specification completeness and consistency
-- Review B: Implementation feasibility
-- Review C: Security and knowledge security
-- Identify gaps and issues
-- Document findings
-- NO implementation
-- NO approval authority (recommends to human)
+1. **USER_DECISION_REQUIRED**
+   - Business decisions AI cannot make
+   - ADSKM-specific: Company standard approval, evidence exceptions, high-risk knowledge adoption
+
+2. **EXTERNAL_ACTION_APPROVAL**
+   - Operations outside development environment
+   - ADSKM-specific: Formal release, production deployment
 
 ---
 
-### BUILD SESSION (After SPEC Approval)
-**Purpose:** Implement to specification  
-**Duration:** Focused implementation session  
-**Inputs:** Approved SPEC  
-**Outputs:** Working code, unit tests  
-**Ends At:** "IMPLEMENTATION READY FOR REVIEW"
+## ADSKM Development Flow (ADS v4.2)
 
-**Agent Role:** Developer/Implementer
-- Follow SPEC exactly
-- Write models, services, validation
-- Write unit tests
-- Document code changes
-- Run validation (pytest, git diff --check)
-- NO spec changes
-- NO architectural decisions
-- NO approval
-
----
-
-### CODE REVIEW SESSION (Separate Context)
-**Purpose:** Independent review of implementation  
-**Duration:** Focused review session  
-**Inputs:** Code diff only  
-**Outputs:** Findings, approval/revision decision
-
-**Agent Role:** Code Reviewer
-- Check correctness
-- Verify spec compliance
-- Test quality
-- Security checks
-- Performance considerations
-- NO architectural changes
-- NO approval authority
+```
+User Request
+    ↓
+HEAD AGENT (Task / Risk Analysis)
+    ├─ SPEC Building
+    ├─ BUILD Sub-Agent (Implementation)
+    ├─ REVIEW Sub-Agents (Independent)
+    │  ├─ Review A: Architecture/Spec
+    │  ├─ Review B: Implementation/Impact
+    │  ├─ Review C: Quality/Operation
+    │  ├─ Security Gate: General Security
+    │  └─ Knowledge Security Gate: ADSKM-specific
+    ├─ SECURITY Sub-Agent (Remediation if needed)
+    ├─ FIX Sub-Agent (Address findings)
+    └─ Autonomous loop until TRIAL-READY
+    ↓
+TRIAL-READY
+    ↓
+USER_DECISION_REQUIRED (Knowledge approval)
+    ↓
+Human Approval
+    ↓
+Canonical Knowledge Master
+    ↓
+EXTERNAL_ACTION_APPROVAL (Release)
+    ↓
+Production Release
+```
 
 ---
 
-### FIX SESSION (If Needed)
-**Purpose:** Address review findings  
-**Duration:** Short focused session  
-**Inputs:** Review findings  
-**Outputs:** Fixed code
+## Key Differences from Prior Structure
 
-**Agent Role:** Fixer
-- Address ONLY review findings
-- No scope expansion
-- No new features
-- No refactoring beyond findings
-- Return to REVIEW
+### REMOVED: Phase-by-phase Human Gates
+- ❌ "SPEC READY FOR REVIEW" → STOP
+- ❌ "SPEC APPROVED" → BUILD
+- ❌ "IMPLEMENTATION READY FOR REVIEW" → STOP
+- ❌ Multiple review session boundaries
 
----
-
-## Agent Responsibilities by Session
-
-### SPEC Session - DO THIS
-- [ ] Read developer instructions
-- [ ] Understand project goals
-- [ ] Define knowledge schema
-- [ ] Define source classification
-- [ ] Define approval workflow
-- [ ] Design system architecture
-- [ ] Document specifications
-- [ ] Create example schemas
-- [ ] Validate spec completeness
-- [ ] Stop at "SPEC READY FOR REVIEW"
-
-### SPEC Session - DON'T DO THIS
-- [ ] Write code
-- [ ] Create database
-- [ ] Set up web server
-- [ ] Create GUI
-- [ ] Approve specifications
-- [ ] Make implementation decisions
-- [ ] Assume future requirements
-- [ ] Over-design
+### ADOPTED: ADS v4.2 Autonomous Model
+- ✅ Continuous SPEC → BUILD → REVIEW → SECURITY → FIX loop
+- ✅ Sub-agents (not separate user sessions)
+- ✅ Only 2 stop conditions: USER_DECISION_REQUIRED + EXTERNAL_ACTION_APPROVAL
+- ✅ Isolated contexts for independent review (within single conversation)
 
 ---
 
-### REVIEW Session - DO THIS
-- [ ] Read SPEC only (not previous sessions)
-- [ ] Review A: Specification consistency
-- [ ] Review B: Completeness check
-- [ ] Review C: Technical feasibility
-- [ ] Check for gaps
-- [ ] Identify risks
-- [ ] Document findings
-- [ ] Recommend approval or revision
+## ADSKM-Specific USER_DECISION_REQUIRED Scenarios
 
-### REVIEW Session - DON'T DO THIS
-- [ ] Reference previous sessions
-- [ ] Implement fixes
-- [ ] Approve specifications
-- [ ] Make architectural changes
-- [ ] Consider implementation details
-- [ ] Assume what builder will do
+**Technical decisions (AI decides):**
+- Schema design
+- Implementation approach
+- Bug fixes
+- Refactoring
+- Security fixes
 
----
-
-### BUILD Session - DO THIS
-- [ ] Read approved SPEC
-- [ ] Implement to specification
-- [ ] Write model classes
-- [ ] Write service methods
-- [ ] Write validation logic
-- [ ] Write unit tests
-- [ ] Test with pytest
-- [ ] Document changes
-- [ ] Stop at "IMPLEMENTATION READY FOR REVIEW"
-
-### BUILD Session - DON'T DO THIS
-- [ ] Change SPEC
-- [ ] Make architectural decisions
-- [ ] Add features beyond SPEC
-- [ ] Add GUI
-- [ ] Add API server
-- [ ] Make assumptions about review
-- [ ] Approve own work
+**Business decisions (Humans decide):**
+- ✋ Company standard Knowledge approval
+- ✋ Promoting general_practice → company_standard
+- ✋ Project Override → Master Knowledge reflection
+- ✋ Evidence-insufficient Knowledge exceptions
+- ✋ HIGH risk Knowledge adoption
+- ✋ Major Knowledge conflicts (e.g., conflicting requirements)
 
 ---
 
-## Context Isolation Rules
+## Independent Review Structure (ADS v4.2)
 
-### Critical: NO Context Bleeding
+**No separate review sessions.** Sub-Agents within HEAD AGENT context:
 
-**SPEC Session:**
-- Does NOT read BUILD session messages
-- Does NOT know implementation details
-- Designs in isolation
+### Review A: Architecture & Specification
+- Validates SPEC completeness
+- Checks architecture consistency
+- No previous review outputs provided
+- Isolated context
 
-**REVIEW (Spec) Session:**
-- Does NOT read previous SPEC session messages
-- Does NOT read BUILD session messages
-- Reviews from fresh context
-- Gets only SPEC documents
+### Review B: Implementation & Impact
+- Validates code against SPEC
+- Checks correctness and completeness
+- Receives only code diff (not Review A results)
+- Isolated context
 
-**BUILD Session:**
-- Does NOT read SPEC session messages (except final SPEC)
-- Gets approved SPEC + instructions only
-- Implements from clear requirements
-- No biasing context
+### Review C: Quality & Operations
+- Validates operational suitability
+- Checks maintainability
+- Receives only quality criteria (not Reviews A/B)
+- Isolated context
 
-**REVIEW (Code) Session:**
-- Does NOT read SPEC messages
-- Does NOT read BUILD messages
-- Gets only code diff
-- Reviews from clean context
+### Security Gate: General Security
+- Data leakage prevention
+- Credential protection
+- Trust boundaries
+- External API safety
+
+### Knowledge Security Gate: ADSKM-Specific
+- **Knowledge Poisoning:** AI cannot unilaterally approve unverified claims
+- **Evidence Integrity:** Evidence version tracking and validation
+- **Approval Contamination:** AI cannot move knowledge to `approved` status
+
+**Each gate uses isolated context. No prior gate results shared.**
+
+---
+
+## What AI CAN Do (ADS v4.2 Autonomously)
+
+✅ Schema design  
+✅ Python implementation  
+✅ Unit test creation  
+✅ Bug fixes  
+✅ Security fixes  
+✅ Audit logging  
+✅ Sub-Agent orchestration  
+✅ Review findings analysis  
+✅ FIX execution  
+✅ Tier escalation  
+✅ Evidence validation  
+
+---
+
+## What AI CANNOT Do (Requires USER_DECISION_REQUIRED)
+
+❌ Approve Knowledge as `company_standard`  
+❌ Promote `general_practice` → `company_standard` without human decision  
+❌ Move Knowledge to `approved` status  
+❌ Accept Evidence-insufficient Knowledge exceptions  
+❌ Approve HIGH risk Knowledge  
+❌ Override conflicting business requirements  
+❌ Release Knowledge to production  
+
+---
+
+## ADSKM Extensions to ADS v4.2 (Not Overrides)
+
+ADSKM adds **project-specific knowledge security requirements** on top of ADS v4.2:
+
+| ADS v4.2 Layer | ADSKM Extension |
+|---|---|
+| General Security | + Knowledge Poisoning Prevention |
+| General Security | + Evidence Integrity Tracking |
+| General Security | + Approval Contamination Prevention |
+| General Security | + Master/Override Isolation |
+| Build/Test/Review | + Knowledge Schema Validation |
+| Review | + Knowledge Security Gates |
+| USER_DECISION | + Knowledge Approval Authority |
+
+**These are extensions, not replacements of ADS v4.2.**
 
 ---
 
 ## Model Tier Routing (ADS v4.2)
 
-### Baseline: Tier 1
-- Standard knowledge structuring
-- Regular validation
-- Normal review processes
-- **Model:** Claude 3.5 Sonnet or equivalent
+**Baseline: Tier 1**
+- Standard implementation
+- Regular schema structuring
+- Normal validation
 
-### Escalate to Tier 2 If:
-- Knowledge schema conflicts
-- Evidence contradictions
-- Security HIGH assessment
-- Complex validation rules
-- **Model:** Claude Opus 5 or equivalent
+**Escalate to Tier 2 if:**
+- Evidence conflicts
+- Complex validation
+- Security HIGH findings
+- Architecture redesign needed
 
-### Escalate to Tier 3 If:
-- Knowledge security critical
-- Trust boundary design
-- Approval workflow architecture
-- Fallback decision logic
-- **Model:** Claude Opus Max or specialized
+**Escalate to Tier 3 if:**
+- Critical knowledge contamination risk
+- Trust boundary compromise
+- Approval mechanism flaw
+- ADS v4.2 core principle violation
 
 ---
 
-## Security & Approvals
+## Autonomous Self-Repair Loop
 
-### What AI CAN Do
-- ✓ Suggest knowledge structures
-- ✓ Extract and format information
-- ✓ Identify evidence gaps
-- ✓ Flag contradictions
-- ✓ Recommend PASS/REVISE
-- ✓ Write validation code
-- ✓ Run tests
-- ✓ Record audit logs
+**Do NOT stop for:**
+- Tier 2/3 escalation
+- Critical review findings
+- Security issues discovered
+- Test failures
+- FIX loops
+- Multiple revisions
 
-### What AI CANNOT Do
-- ✗ Approve knowledge (humans only)
-- ✗ Bypass security gates
-- ✗ Modify source files outside gate
-- ✗ Self-approve code
-- ✗ Promote general_practice to company_standard unilaterally
-- ✗ Remove audit entries
-- ✗ Modify approval signatures
-- ✗ Override human decisions
+HEAD AGENT orchestrates until TRIAL-READY or USER_DECISION_REQUIRED.
 
 ---
 
-## Communication Protocol
+## EXTERNAL_ACTION_APPROVAL (ADS v4.2 Official)
 
-### Between Humans & AI
+These require explicit human approval:
 
-**Developer → AI:**
 ```
-"Implement the approved SPEC. Follow the requirements exactly.
-Stop at 'IMPLEMENTATION READY FOR REVIEW'."
-```
-
-**AI → Human (after SPEC):**
-```
-"SPEC is complete and ready for review.
-Output: APP-SPEC.md, KNOWLEDGE-SCHEMA.md, PROJECT-OVERRIDE-SCHEMA.md
-Status: SPEC READY FOR REVIEW
-Next: Independent review session"
+Formal release/deployment
+External system write
+Production data modification
+Irreversible operations
+Large expense operations
 ```
 
-**Human → AI (after REVIEW):**
+ADSKM-specific:
 ```
-"SPEC approved. Proceed with BUILD session."
-```
-
-**AI → Human (after BUILD):**
-```
-"Implementation complete and tested.
-Tests: NN% coverage, all passing
-Status: IMPLEMENTATION READY FOR REVIEW
-Next: Code review session"
+Publish Knowledge to production Master
+External system integration
+Real-world deployment
 ```
 
 ---
 
-## Handoff Between Sessions
+## Success Criteria (TRIAL-READY)
 
-Each session ends with brief handoff:
+At TRIAL-READY, the following must be true:
 
-```yaml
-handoff:
-  project: ADSKM
-  session_type: SPEC
-  status: READY FOR REVIEW
-  outputs:
-    - APP-SPEC.md
-    - docs/KNOWLEDGE-SCHEMA.md
-    - docs/PROJECT-OVERRIDE-SCHEMA.md
-    - docs/ADSKM-OVERVIEW.md
-  key_decisions:
-    - YAML for knowledge storage
-    - Pydantic for validation
-    - No database for MVP
-  unresolved:
-    - []
-  next_action: "Independent review of specifications"
 ```
-
-Next session reads handoff and uses it as context anchor.
+✅ APP-SPEC.md complete and consistent
+✅ KNOWLEDGE-SCHEMA.md fully defined
+✅ Knowledge security gates verified
+✅ All sub-agent reviews PASS
+✅ Security gate PASS
+✅ No Critical/Major issues
+✅ Test coverage 80%+
+✅ Code ready for production use
+✅ Audit trail complete
+✅ Ready for knowledge approval decision
+```
 
 ---
 
-## ADS v4.2 Compliance Checklist
+## Expected User Interactions
 
-- [ ] Session separation (SPEC → REVIEW → BUILD → REVIEW → FIX)
-- [ ] Context isolation (each session fresh context)
-- [ ] Risk classification (knowledge security = HIGH)
-- [ ] Independent review (separate reviewer context)
-- [ ] Security gates (multiple checkpoints)
-- [ ] Human gates (no AI approval)
-- [ ] Model tier routing (mostly Tier 1, escalate if needed)
-- [ ] Human decision final (AI recommends, human decides)
-- [ ] Audit trail (all changes logged)
-- [ ] No self-approval (AI cannot approve own work)
+1. **Initial Request:** "Build ADSKM system for [scope]"
+2. **Autonomous Execution:** HEAD AGENT runs build → review → security → fix loops
+3. **Stop 1 (if needed):** "Knowledge approval decision needed for [item]"
+   - User: "Approve as company_standard" OR "Keep as reference" OR "Reject"
+4. **Resume & Complete:** Continue to TRIAL-READY
+5. **Stop 2 (if needed):** "Ready to release to production?"
+   - User: "GO" or "Wait"
+6. **Result:** TRIAL-READY system delivered
 
 ---
 
@@ -319,4 +274,6 @@ Next session reads handoff and uses it as context anchor.
 
 ---
 
-For ADS v4.2 details, refer to official ADS documentation.
+**ADS v4.2.0 Compliance:** ✅ Official standard adopted  
+**ADSKM Extensions:** ✅ Knowledge security added without overriding ADS  
+**Repository Reference:** E:\dev\ai-dev-standard (v4.2.0 tag)

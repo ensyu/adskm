@@ -461,46 +461,64 @@ adskm/
 
 ---
 
-## 11. Development Session Structure
+## 11. Development Flow (ADS v4.2 Autonomous Model)
 
-### Session Types
+ADSKM follows official ADS v4.2.0 standard with autonomous execution:
 
-**SPEC SESSION** (This session)
-- Define requirements and architecture
-- Create specification documents
-- Output: APP-SPEC.md, schema definitions
-- Ends: "SPEC READY FOR REVIEW"
-- Does NOT implement code
+```
+User Request
+    ↓
+HEAD AGENT Orchestration
+    ├─ Build SPEC
+    ├─ BUILD Sub-Agent: Implementation
+    ├─ REVIEW Sub-Agents: Independent Review
+    │  ├─ Review A: Architecture/Spec
+    │  ├─ Review B: Implementation/Impact
+    │  ├─ Review C: Quality/Operation
+    │  ├─ Security Gate: General
+    │  └─ Knowledge Security: ADSKM-specific
+    ├─ SECURITY Sub-Agent: Issue remediation
+    ├─ FIX Sub-Agent: Address findings
+    └─ Autonomous loop to TRIAL-READY
+    ↓
+TRIAL-READY
+    ↓
+USER_DECISION_REQUIRED
+  (Company standard approval, evidence exceptions, high-risk knowledge)
+    ↓
+Human Approval → Canonical Master
+    ↓
+EXTERNAL_ACTION_APPROVAL
+  (Formal release, production deployment)
+    ↓
+Released
+```
 
-**REVIEW SESSION** (Separate context)
-- Independent review of specifications
-- Review A: Architecture consistency
-- Review B: Completeness
-- Review C: Feasibility
-- Security review
-- Ends: "SPEC APPROVED" or "REVISE REQUIRED"
+### Stopping Conditions (ADS v4.2)
 
-**BUILD SESSION** (After SPEC approval)
-- Implement to specification
-- Unit tests included
-- Ends: "IMPLEMENTATION READY FOR REVIEW"
-- Code review in separate context
+**No human gates between technical phases.**
 
-**REVIEW SESSION** (Code review)
-- Separate context
-- Independent code review
-- Ends: "APPROVED" or "REVISE REQUIRED"
+**Only 2 stopping conditions:**
 
-**FIX SESSION** (If needed)
-- Address review findings only
-- No scope expansion
-- Then return to code review
+1. **USER_DECISION_REQUIRED**
+   - Business decisions: Company standard approval, evidence exceptions, risk decisions
+   - AI completes TRIAL-READY and awaits human decision
 
-### Context Isolation
-- Each session is separate Claude context
-- No bleeding of implementation details into review
-- Reviewers see only spec or code, not both
-- Prevents bias and conflict of interest
+2. **EXTERNAL_ACTION_APPROVAL**
+   - External/irreversible: Formal release, production deployment, real-world impact
+   - Requires explicit human authorization before proceeding
+
+### Independent Review (Sub-Agent based)
+
+All reviews use **isolated Sub-Agent contexts within single conversation:**
+
+- **Review A:** Architecture/Spec (isolated context, no Review B/C output)
+- **Review B:** Implementation/Impact (isolated, no Review A/C output)
+- **Review C:** Quality/Operation (isolated, no Review A/B output)
+- **Security Gate:** General security (isolated)
+- **Knowledge Security:** ADSKM-specific (isolated)
+
+**Key:** Each reviewer gets only their evaluation criteria, not other reviewers' conclusions.
 
 ---
 
@@ -576,14 +594,30 @@ adskm/
 
 ## 14. ADS v4.2 Compliance
 
-This specification follows ADS v4.2 standards:
-- **Session Separation:** Different contexts for SPEC/BUILD/REVIEW/FIX
-- **Risk Classification:** Knowledge security as elevated risk
-- **Independent Review:** Required before approval
-- **Security Gates:** Multiple security checkpoints
-- **Model Tier Routing:** Standard Tier 1; escalate if needed
-- **Human Gates:** No AI self-approval
-- **Context Budget:** Keep sessions focused and scoped
+This specification adopts official ADS v4.2.0 standard:
+
+**ADS v4.2 Core Model:**
+```
+ONE REQUEST. ONE CONVERSATION. AUTONOMOUS EXECUTION TO TRIAL-READY.
+```
+
+**Compliance:**
+- ✅ **Autonomous Execution:** HEAD AGENT orchestrates BUILD → REVIEW → SECURITY → FIX loops
+- ✅ **No Phase Gates:** Technical phases loop autonomously; only 2 stopping conditions
+- ✅ **Sub-Agent Review:** Independent review using isolated contexts (not separate sessions)
+- ✅ **USER_DECISION_REQUIRED:** Business decisions (company standard approval, evidence exceptions)
+- ✅ **EXTERNAL_ACTION_APPROVAL:** Formal release and external operations only
+- ✅ **Model Tier Routing:** Tier 1 baseline; Tier 2/3 escalation if needed
+- ✅ **Risk Classification:** Knowledge security as specialized risk domain
+
+**ADSKM Extensions (not overrides):**
+- Knowledge Poisoning prevention
+- Evidence Integrity tracking
+- Approval Contamination prevention
+- Master/Override isolation
+- Knowledge Security gates (separate from general Security)
+
+**Reference:** ADS v4.2.0 official (E:\dev\ai-dev-standard, tag v4.2.0)
 
 ---
 
@@ -635,26 +669,50 @@ The following limitations are **intentional MVP design decisions**, not oversigh
 
 ---
 
-## 16. Next Actions
+## 16. Next Actions (ADS v4.2 Autonomous Model)
 
-1. **SPEC REVIEW SESSION** (Separate context)
-   - Independent review of this specification
-   - Fix any gaps or inconsistencies
-   - Security review
+Following ADS v4.2 standard, next steps are automated under HEAD AGENT orchestration:
 
-2. **HUMAN APPROVAL**
-   - Manager/Director approval of SPEC
-   - Final scope confirmation
+1. **SPEC Finalization Review** (Sub-Agent, isolated context)
+   - Review A: Specification completeness and architecture
+   - Review B: Implementation feasibility
+   - Review C: Operational suitability
+   - Security Gate: General security assessment
+   - Knowledge Security Gate: Knowledge-specific threats
 
-3. **BUILD SESSION** (Separate context)
-   - Implement to specification
-   - Create unit tests
-   - Output: Implementation ready for review
+2. **BUILD Phase** (Sub-Agent, if SPEC reviewers PASS)
+   - Implementation to SPEC
+   - Unit test creation
+   - Local validation
 
-4. **CODE REVIEW SESSION**
-   - Independent code review
-   - Security verification
-   - Approval or revision
+3. **REVIEW Phase** (Sub-Agents, isolated contexts)
+   - Code/Implementation review
+   - Quality verification
+   - Security deep-dive
+   - Knowledge Security re-check
+
+4. **FIX Phase** (Sub-Agent, if findings detected)
+   - Address review findings
+   - Re-test and re-verify
+   - Loop back to Review if needed
+
+5. **TRIAL-READY** (Autonomous completion)
+   - All sub-agent reviews PASS
+   - Security gates cleared
+   - Knowledge security verified
+   - 80%+ test coverage
+
+6. **USER_DECISION_REQUIRED** (Stop condition)
+   - Business approval decision needed
+   - Company standard Knowledge adoption
+   - Evidence exception handling
+   - High-risk Knowledge approval
+
+7. **EXTERNAL_ACTION_APPROVAL** (Stop condition if needed)
+   - Formal release authorization
+   - Production deployment approval
+
+**No human gates between technical phases (SPEC/BUILD/REVIEW/FIX).** HEAD AGENT loops autonomously until TRIAL-READY or stopping condition.
 
 ---
 

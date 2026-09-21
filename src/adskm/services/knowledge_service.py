@@ -42,11 +42,14 @@ class KnowledgeService:
         filename = f"{knowledge_id}.yaml"
         file_path = base_dir / filename
 
-        # Check for path traversal
+        # Safe path validation using Python 3.12's is_relative_to()
         try:
             resolved = file_path.resolve()
             base_resolved = base_dir.resolve()
-            if not str(resolved).startswith(str(base_resolved)):
+            # Verify resolved path is relative to base (ensures no escape)
+            try:
+                resolved.relative_to(base_resolved)
+            except ValueError:
                 raise ValueError(f"Path escapes boundary: {file_path}")
         except Exception as e:
             raise ValueError(f"Invalid path: {e}")
@@ -102,11 +105,12 @@ class KnowledgeService:
         # Validate schema
         try:
             record = KnowledgeRecord(**data)
-            # Access control: creator and assigned reviewers only
-            if user_id:
-                if user_id != record.approval.created_by:
-                    # Could add assigned_reviewers check here
-                    pass
+
+            # MANDATORY: Access control enforcement
+            # Only creator can access draft (assigned_reviewers field for future enhancement)
+            if user_id and user_id != record.approval.created_by:
+                return False, None, f"Access denied: user '{user_id}' cannot access draft '{knowledge_id}' (created by {record.approval.created_by})"
+
             return True, record, ""
         except Exception as e:
             return False, None, f"Schema validation error: {e}"
@@ -120,7 +124,7 @@ class KnowledgeService:
         """
         # Validate record
         try:
-            record_validated = KnowledgeRecord(**record.dict())
+            record_validated = KnowledgeRecord(**record.model_dump())
         except Exception as e:
             return False, f"Record validation failed: {e}"
 
@@ -148,9 +152,11 @@ class KnowledgeService:
 
         Returns: (success, error_message)
         """
-        # Only humans can approve
-        if "ai_" in approver_id.lower() or "agent" in approver_id.lower():
-            return False, "AI cannot approve knowledge; human approval required"
+        # CRITICAL: Only humans can approve
+        # Use case-insensitive patterns to catch AI/automation identifiers
+        ai_patterns = ["ai_", "ai-", "agent_", "agent-", "automation_", "automation-", "system_", "system-", "claude", "bot_", "bot-"]
+        if any(pattern in approver_id.lower() for pattern in ai_patterns):
+            return False, "AI/automation cannot approve knowledge; human approval required"
 
         # Must be approved status
         if record.metadata.status not in ["approved"]:
@@ -159,6 +165,10 @@ class KnowledgeService:
         # Must have approval metadata
         if not record.approval.approved_at or not record.approval.approved_by:
             return False, "Master knowledge missing approval metadata"
+
+        # Verify approver matches approval metadata
+        if record.approval.approved_by != approver_id:
+            return False, "Approver ID mismatch with record approval metadata"
 
         file_path = self._get_knowledge_path(record.metadata.id, scope="master")
 

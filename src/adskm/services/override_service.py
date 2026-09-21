@@ -20,7 +20,7 @@ class OverrideService:
         self.overrides_dir.mkdir(parents=True, exist_ok=True)
 
     def _get_override_path(self, knowledge_id: str, project_id: str) -> Path:
-        """Resolve override file path safely.
+        """Resolve override file path safely with double-layer validation.
 
         Returns: Path (validated)
         """
@@ -28,12 +28,26 @@ class OverrideService:
         filename = f"{knowledge_id}.yaml"
         file_path = project_dir / filename
 
-        # Path traversal prevention
+        # Path traversal prevention with double-layer validation
         try:
             resolved = file_path.resolve()
             project_resolved = project_dir.resolve()
-            if not str(resolved).startswith(str(project_resolved)):
-                raise ValueError(f"Path escapes boundary")
+            overrides_resolved = self.overrides_dir.resolve()
+
+            # Layer 1: Verify file is within project directory
+            try:
+                resolved.relative_to(project_resolved)
+            except ValueError:
+                raise ValueError(f"Path escapes project boundary")
+
+            # Layer 2: Verify project directory is within overrides directory
+            try:
+                project_resolved.relative_to(overrides_resolved)
+            except ValueError:
+                raise ValueError(f"Project directory escapes overrides boundary")
+
+        except ValueError as e:
+            raise ValueError(f"Path validation failed: {e}")
         except Exception as e:
             raise ValueError(f"Invalid path: {e}")
 
@@ -72,7 +86,7 @@ class OverrideService:
         """
         # Validate override
         try:
-            ProjectOverride(**override.dict())
+            ProjectOverride(**override.model_dump())
         except Exception as e:
             return False, f"Override validation failed: {e}"
 

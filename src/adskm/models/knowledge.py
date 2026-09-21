@@ -1,7 +1,7 @@
 """Knowledge Record Schema (Pydantic v2)."""
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Literal, Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
 SourceType = Literal[
@@ -181,14 +181,15 @@ class MetadataModel(BaseModel):
 class KnowledgeRecord(BaseModel):
     """Complete knowledge record schema."""
 
+    model_config = ConfigDict(
+        validate_assignment=True,
+        str_strip_whitespace=False,  # Preserve intentional whitespace
+    )
+
     metadata: MetadataModel
     content: ContentModel
     source: SourceModel
     approval: ApprovalModel
-
-    class Config:
-        validate_assignment = True
-        str_strip_whitespace = False  # Preserve intentional whitespace
 
 
 def create_knowledge_record(
@@ -204,7 +205,7 @@ def create_knowledge_record(
     created_by: str = "system",
 ) -> KnowledgeRecord:
     """Factory function to create knowledge record."""
-    now = datetime.utcnow().isoformat() + "Z"
+    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
     return KnowledgeRecord(
         metadata=MetadataModel(

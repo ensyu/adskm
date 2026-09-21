@@ -61,14 +61,23 @@ class EvidenceValidator:
             issues.append("primary_source_type not set")
             return False, issues
 
-        # Rule: AI cannot unilaterally promote general_practice to company_standard
-        if (
-            source.primary_source_type == "company_standard"
-            and "ai_structured" in record.approval.created_by.lower()
-        ):
+        # CRITICAL Rule: AI cannot unilaterally promote to company_standard
+        # Check: primary_source_type is company_standard but created by AI
+        ai_patterns = ["ai_", "ai-", "agent_", "agent-", "automation_", "automation-", "system_", "claude", "bot_"]
+        is_ai_created = any(pattern in record.approval.created_by.lower() for pattern in ai_patterns)
+
+        if source.primary_source_type == "company_standard" and is_ai_created:
             issues.append(
-                "AI cannot unilaterally classify as company_standard; "
-                "requires manager approval"
+                "HUMAN_APPROVAL_REQUIRED: AI cannot unilaterally classify as company_standard; "
+                "manager/director approval required"
+            )
+
+        # CRITICAL Rule: general_practice cannot be automatically promoted to company_standard
+        # This must be explicit Human Decision
+        if source.primary_source_type == "company_standard" and source.source_classification == "general_practice":
+            issues.append(
+                "USER_DECISION_REQUIRED: Promotion from general_practice to company_standard "
+                "requires explicit human business decision (manager/director approval)"
             )
 
         # Classify restrictions

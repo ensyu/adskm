@@ -1,6 +1,6 @@
 """Audit Log Schema (Pydantic v2)."""
 from typing import Literal, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 AuditAction = Literal[
@@ -16,6 +16,8 @@ AuditAction = Literal[
 
 class AuditEntry(BaseModel):
     """Single audit log entry (immutable record)."""
+
+    model_config = ConfigDict(validate_assignment=True)
 
     timestamp: str = Field(...)  # ISO 8601 datetime
     change_id: str = Field(...)  # Unique identifier
@@ -34,9 +36,6 @@ class AuditEntry(BaseModel):
     reason: Optional[str] = Field(None, max_length=1000)
     approval_comment: Optional[str] = Field(None, max_length=2000)
     security_notes: Optional[str] = Field(None, max_length=1000)
-
-    class Config:
-        validate_assignment = True
 
 
 def create_audit_entry(

@@ -138,7 +138,7 @@ class AuditService:
         return True, sorted(entries, key=lambda e: e.timestamp), ""
 
     def _read_file(self, file_path: Path) -> Tuple[bool, List[AuditEntry], str]:
-        """Read audit entries from single file.
+        """Read audit entries from single file using yaml.safe_load_all.
 
         Returns: (success, entries, error_message)
         """
@@ -146,24 +146,15 @@ class AuditService:
 
         try:
             with open(file_path, "r", encoding="utf-8") as f:
-                content = f.read()
-
-            # Split on YAML stream separator
-            if not content.strip():
-                return True, [], ""
-
-            blocks = content.split("---\n")
-            for block in blocks:
-                if not block.strip():
-                    continue
-
-                try:
-                    data = yaml.safe_load(block)
+                # Use yaml.safe_load_all() to parse YAML stream (handles --- separator safely)
+                for data in yaml.safe_load_all(f):
                     if data:
-                        entry = AuditEntry(**data)
-                        entries.append(entry)
-                except Exception as e:
-                    return False, [], f"Parse error in {file_path}: {e}"
+                        try:
+                            entry = AuditEntry(**data)
+                            entries.append(entry)
+                        except Exception as e:
+                            # Log parse error but continue with other entries
+                            return False, [], f"Parse error in {file_path}: {e}"
 
             return True, entries, ""
 

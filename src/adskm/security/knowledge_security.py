@@ -129,9 +129,9 @@ class KnowledgeSecurityValidator:
 
         Returns: (is_current, age_assessment)
         """
-        from datetime import datetime
+        from datetime import datetime, timezone
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         max_age_years = 2
 
         if record.source.sources:

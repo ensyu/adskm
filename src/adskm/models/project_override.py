@@ -1,6 +1,6 @@
 """Project Override Schema (Project-specific knowledge exceptions)."""
 from typing import Literal, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from .knowledge import (
     ContentModel,
     SourceModel,
@@ -27,6 +27,8 @@ class OverrideMetadataModel(BaseModel):
 class ProjectOverride(BaseModel):
     """Project-specific override (isolated from master knowledge)."""
 
+    model_config = ConfigDict(validate_assignment=True)
+
     metadata: OverrideMetadataModel
     content: ContentModel
     source: SourceModel
@@ -35,9 +37,6 @@ class ProjectOverride(BaseModel):
         ...,
         pattern=r"^KNW-[A-Z0-9]{3}-[A-Z0-9]{3}-[0-9]{3}$",
     )
-
-    class Config:
-        validate_assignment = True
 
 
 def create_project_override(
@@ -50,9 +49,9 @@ def create_project_override(
     created_by: str = "system",
 ) -> ProjectOverride:
     """Factory function to create project override."""
-    from datetime import datetime
+    from datetime import datetime, timezone
 
-    now = datetime.utcnow().isoformat() + "Z"
+    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
     return ProjectOverride(
         metadata=OverrideMetadataModel(

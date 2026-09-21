@@ -591,141 +591,184 @@ audit_entry:
 
 ## 10. Operational & Implementation Details
 
-### 10.1 Versioning Policy
+### 10.1 YAML Security Requirements (CRITICAL)
 
-**Version Numbering: Semantic Versioning (MAJOR.MINOR.PATCH)**
+**Threat Model:** YAML injection attacks, arbitrary code execution, DoS attacks
 
-When to increment:
+**Safe Parsing Mandate (CRITICAL):**
+- **ALL YAML parsing MUST use `yaml.safe_load()` exclusively**
+- **NEVER use `yaml.load()`** — arbitrary code execution vulnerability
+- **Enforcement:** Pydantic validator + service-layer checks
 
-```yaml
-MAJOR version:
-  - Knowledge requirement structure fundamentally changes (requirement added/removed)
-  - Approval status transitions to superseded (knowledge wholly replaced)
-  - Scope changes (master ↔ project_override)
-  
-MINOR version:
-  - Evidence updated (sources added/changed/removed)
-  - evidence_sufficiency changes (insufficient → sufficient)
-  - Source version changes (e.g., regulation updated)
-  - confidence_level changes across sources
-  
-PATCH version:
-  - Metadata-only changes (approval_comment, title refinement)
-  - status changes (draft → review_required)
-  - Non-content field updates (knowledge_type, risk_level adjustment)
-```
+**Maximum File Size Limit:**
+- Knowledge records: Maximum 1 MB per file
+- Rationale: Prevent DoS attacks via oversized payloads
+- Enforcement: Check file size before `yaml.safe_load()`; reject > 1MB with error
 
-**Implementation:** Audit log `new_version` field increments automatically; creator/reviewer cannot manually override.
-
-### 10.2 Error Handling & Recovery
-
-**YAML Parse Failures**
-- Symptom: Malformed YAML syntax in knowledge files
-- Response: Log error with file path and line number; skip file; continue processing others
-- Recovery: Manual human intervention required; file moved to `knowledge/corrupted/` for review
-- Alert: Operator notification for manual remediation
-
-**Pydantic Validation Failures**
-- Symptom: Required field missing, type mismatch, enum value invalid
-- Response: Return detailed field-level errors to creator/reviewer
-- Recovery: Prevent save to master/; allow save to drafts/ for revision with error details
-- Decision: Require explicit error correction before re-submission
-
-**Audit Log Write Failures**
-- Symptom: Cannot append to audit log file (permissions, disk full, I/O error)
-- Response: **CRITICAL** — do not finalize knowledge save; rollback transaction
-- Recovery: Rollback knowledge record to previous state; raise alert to operator
-- Rationale: Audit trail integrity is non-negotiable
-
-**Source Accessibility Failures**
-- Symptom: URL unreachable, file path invalid, source not found
-- Response: Log as warning in evidence_notes; do NOT block knowledge creation
-- Recovery: Manual decision to proceed with insufficient evidence or locate alternative source
-- Escalation: If critical source inaccessible → Evidence Exception pathway (Section 7)
-
-**Broken Source in Approved Knowledge**
-- Symptom: Periodic verification detects source link now broken
-- Response: Trigger knowledge review; create superseding record with updated sources
-- Recovery: Previous knowledge marked as "evidence_compromised"; manual decision to update or retire
-- Notification: Alert all projects using this knowledge
-
-### 10.3 Access Control Model
-
-**File-level Permissions (Filesystem)**
-
-```yaml
-knowledge/master/
-  - Owner: deployment service account
-  - Permissions: 550 (rwxr-x---)
-  - File permission after approval: 440 (r--r-----)
-  - Write-protect once approved: immutable in operational use
-
-knowledge/overrides/<project_id>/
-  - Owner: project service account
-  - Permissions: 770 (rwxrwx---)
-  - Readable by: project team members
-  - Not readable by: other projects, general public
-
-knowledge/drafts/
-  - Owner: creator/assigned reviewer
-  - Permissions: 600 (rw-------)
-  - Accessible only to: creator, assigned reviewers
-
-knowledge/audit_logs/
-  - Owner: deployment service account
-  - Permissions: 444 (r--r--r--)
-  - Append-only: locking mechanism prevents concurrent writes
-```
-
-**Service-layer Access Control**
-
+**Implementation Checklist:**
 ```python
-# Pseudocode for KnowledgeService access checks
-
-def load_master(knowledge_id):
-  # Always allowed; read-only access to approved master knowledge
-  validate_knowledge_id_format(knowledge_id)
-  return read_file(f"knowledge/master/{knowledge_id}.yaml")
-
-def load_draft(knowledge_id, user_id):
-  # Restricted: creator and assigned reviewers only
-  draft = read_file(f"knowledge/drafts/{knowledge_id}.yaml")
-  if draft.created_by != user_id and user_id not in draft.assigned_reviewers:
-    raise AccessDenied("Not authorized to view draft knowledge")
-  return draft
-
-def load_override(knowledge_id, project_id, user_id):
-  # Restricted: project members only
-  if not is_project_member(project_id, user_id):
-    raise AccessDenied("Not authorized to access project overrides")
-  return read_file(f"knowledge/overrides/{project_id}/{knowledge_id}.yaml")
-
-def save_master(knowledge_record, approver_id):
-  # Restricted: Approval Authority only; triggers immutability
-  if not has_approval_authority(approver_id):
-    raise AccessDenied("Insufficient authorization to approve knowledge")
-  write_file(f"knowledge/master/{knowledge_record.id}.yaml", knowledge_record)
-  set_file_immutable(f"knowledge/master/{knowledge_record.id}.yaml")
+# Pseudocode
+def load_knowledge_yaml(file_path):
+  # 1. Check file size
+  if os.path.getsize(file_path) > 1_000_000:
+    raise ValueError("Knowledge file exceeds 1 MB limit")
+  
+  # 2. Use safe_load ONLY
+  with open(file_path, 'r', encoding='utf-8') as f:
+    data = yaml.safe_load(f)
+  
+  # 3. Validate against schema
+  validated = KnowledgeRecord(**data)
+  return validated
 ```
 
-### 10.4 Interaction Model (MVP Limitation)
-
-**Current State:** No CLI/Web UI in MVP
-
-**Workaround for MVP:**
-- Knowledge creation/approval conducted via Python scripts + manual YAML editing
-- Test case: Demonstrate full workflow with KNW-W01-FND-001 example record
-- Assumption: MVP operators are technically capable (engineers, not construction workers)
-
-**Post-MVP Requirement:**
-- CLI interface (minimal viable): `adskm knowledge register`, `adskm knowledge approve`
-- Web UI (future): Project dashboard, knowledge search, approval workflow UI
+**Testing Requirements:**
+- Unit test: YAML injection attempt must be rejected with clear error
+- Integration test: Verify `yaml.load()` is never called in codebase
+- Pre-commit hook: Prevent commits containing `yaml.load()` (non-safe-load usage)
 
 ---
 
-## 11. System Architecture (Code)
+### 10.2 Input Validation & Sanitization
 
-### 10.1 Versioning Policy
+**Knowledge ID Format Validation:**
+```
+Format: KNW-[A-Z0-9]{3}-[A-Z0-9]{3}-[0-9]{3}
+Example: KNW-W01-FND-001
+Regex: ^KNW-[A-Z0-9]{3}-[A-Z0-9]{3}-[0-9]{3}$
+Rejection: Any ID not matching format
+```
+
+**Path Traversal Prevention (CRITICAL):**
+- Reject any ID containing: `..`, `./`, `~`, symlinks, path separators (`\`, `/`)
+- Implementation: Normalize paths using `pathlib.Path.resolve()`
+- Validation: Confirm all file operations stay within `knowledge/` directory
+- Cross-platform: Works on Windows + Unix/Linux
+
+**Field Length Limits:**
+| Field | Max Length | Rationale |
+|---|---|---|
+| `title` | 100 chars | Prevent unbounded metadata |
+| `summary` | 500 chars | Knowledge overview brevity |
+| `approval_comment` | 2000 chars | Detailed approval rationale |
+| `evidence_notes` | 5000 chars | Complex evidence documentation |
+| URL in source | 2048 chars | Standard URL limit |
+
+**URL Validation:**
+- Scheme: Must be `http://` or `https://` only
+- Domain: Optional internal whitelist (e.g., company intranet)
+- **Explicit prohibition:** No credentials in URL parameters (`username:password@host`)
+- Validation: urllib.parse + regex check
+
+**String Sanitization:**
+- Remove control characters (0x00–0x1F except `\n`, `\t`, `\r`)
+- Encoding: UTF-8 only; reject invalid UTF-8 sequences
+- Whitespace: Normalize CRLF to LF; trim leading/trailing spaces
+
+**Implementation:**
+```python
+# In Pydantic validators
+class KnowledgeRecord(BaseModel):
+  id: str = Field(..., regex=r'^KNW-[A-Z0-9]{3}-[A-Z0-9]{3}-[0-9]{3}$')
+  content: ContentModel
+
+  @validator('id')
+  def validate_no_path_traversal(cls, v):
+    if '..' in v or '/' in v or '\\' in v or '~' in v:
+      raise ValueError("Path traversal characters not allowed in ID")
+    return v
+```
+
+**Testing Requirements:**
+- Unit test: Path traversal attempts rejected (`../../../`, `~user/`, symlinks)
+- Unit test: YAML injection attempt rejected
+- Unit test: Field length limits enforced
+- Unit test: Invalid UTF-8 sequences rejected
+
+---
+
+### 10.3 Audit Log Immutability Enforcement
+
+**Threat Model:** Tampering with audit records, retroactive modification, evidence of approvals altered
+
+**MVP Implementation: Append-Only File Strategy**
+
+1. **Write Operation Rules:**
+   - New entries appended only; no retroactive modification
+   - No in-process modification of closed audit files
+   - File permissions set to `444` (r--r--r--) after audit rotation
+   - Audit entries immutable once written
+
+2. **Concurrency Control (MANDATORY):**
+
+   **Unix/Linux (fcntl-based):**
+   ```python
+   import fcntl
+
+   def append_audit_entry(entry):
+     with open(audit_file_path, 'a') as f:
+       fcntl.flock(f.fileno(), fcntl.LOCK_EX)  # Exclusive lock
+       try:
+         yaml.safe_dump([entry], f, append=True)
+       finally:
+         fcntl.flock(f.fileno(), fcntl.LOCK_UN)  # Unlock
+   ```
+
+   **Windows (LockFile API):**
+   ```python
+   import msvcrt
+
+   def append_audit_entry(entry):
+     with open(audit_file_path, 'a') as f:
+       msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+       try:
+         yaml.safe_dump([entry], f, append=True)
+       finally:
+         msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+   ```
+
+3. **Mutex-based In-Memory Locking:**
+   - For concurrent processes within same VM
+   - Per-audit-file mutex; prevents race conditions
+   - Implementation: `threading.Lock` (single-process) or `multiprocessing.Lock` (multi-process)
+
+4. **Read Access Control:**
+   - Always consult most recent file state
+   - Audit logs: Read-only after append
+   - Access: Approval Authority + Auditors only
+   - No permission to delete or modify audit entries
+
+5. **Access Control Matrix:**
+   ```yaml
+   audit_logs/ permissions:
+     - Owner: deployment service account
+     - Permissions: 444 (r--r--r--)
+     - Append: Only audit_service.append() can write
+     - Read: Approval Authority + Auditors only
+     - Delete: NEVER (audit trail immutable)
+   ```
+
+**Post-MVP: Cryptographic Ledger (Q1 2027 Target)**
+- Algorithm: SHA-256 hash-chain (each entry includes hash of previous)
+- Verification: Entry tampering detected by hash mismatch
+- Immutability proof: Sequential hashes form unbreakable chain
+- Migration path: Export existing YAML, migrate to ledger format
+
+**Implementation Roadmap:**
+- **Q4 2026 (MVP):** File locking + append-only YAML
+- **Q1 2027:** Design cryptographic ledger specification
+- **Q2 2027:** Implement hash-chain ledger
+- **Q3 2027:** Migration tools + verification utilities
+
+**Testing Requirements:**
+- Unit test: Concurrent writes from multiple processes → entries recorded in order
+- Unit test: Audit log cannot be retroactively modified
+- Integration test: Verify file locking prevents race conditions
+- Cross-platform test: Unix fcntl + Windows LockFile both functional
+
+---
+
+### 10.4 Versioning Policy
 
 **Version Numbering: Semantic Versioning (MAJOR.MINOR.PATCH)**
 
@@ -751,7 +794,7 @@ PATCH version:
 
 **Implementation:** Audit log `new_version` field increments automatically; creator/reviewer cannot manually override.
 
-### 10.2 Error Handling & Recovery
+### 10.5 Error Handling & Recovery
 
 **YAML Parse Failures**
 - Symptom: Malformed YAML syntax in knowledge files
@@ -766,7 +809,7 @@ PATCH version:
 - Decision: Require explicit error correction before re-submission
 
 **Audit Log Write Failures**
-- Symptom: Cannot append to audit log file (permissions, disk full, I/O error)
+- Symptom: Cannot append to audit log file (permissions, disk full, I/O error, locking timeout)
 - Response: **CRITICAL** — do not finalize knowledge save; rollback transaction
 - Recovery: Rollback knowledge record to previous state; raise alert to operator
 - Rationale: Audit trail integrity is non-negotiable
@@ -783,7 +826,7 @@ PATCH version:
 - Recovery: Previous knowledge marked as "evidence_compromised"; manual decision to update or retire
 - Notification: Alert all projects using this knowledge
 
-### 10.3 Access Control Model
+### 10.6 Access Control Model
 
 **File-level Permissions (Filesystem)**
 
@@ -842,7 +885,7 @@ def save_master(knowledge_record, approver_id):
   set_file_immutable(f"knowledge/master/{knowledge_record.id}.yaml")
 ```
 
-### 10.4 Interaction Model (MVP Limitation)
+### 10.7 Interaction Model (MVP Limitation)
 
 **Current State:** No CLI/Web UI in MVP
 

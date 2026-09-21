@@ -611,6 +611,30 @@ This specification follows ADS v4.2 standards:
 
 ---
 
+## 15.1 MVP Constraints (Intentional)
+
+The following limitations are **intentional MVP design decisions**, not oversight:
+
+### Knowledge Aging
+- **Constraint:** Knowledge aging review is **manual** in MVP
+- **How it works:** Site subject matter experts periodically review knowledge records
+- **Decision trigger:** Human decides when knowledge is outdated or needs superseding
+- **Future enhancement:** Automatic detection of knowledge exceeding age threshold (Post-MVP)
+- **Rationale:** MVP prioritizes quality over automation; manual review ensures careful transitions
+
+### Database Deferral
+- **Constraint:** YAML files + Git, no relational database
+- **Rationale:** Sufficient for single-phase MVP; clearer audit trail with Git history
+- **Future:** Database considered when multi-phase/multi-building scaling requires
+
+### External Integrations (Post-MVP)
+- Kanna, Garoon, Box, OneDrive: Deferred
+- MCP authorization: Deferred
+- Automatic photo analysis: Deferred
+- Web API: Deferred
+
+---
+
 ## 16. Next Actions
 
 1. **SPEC REVIEW SESSION** (Separate context)

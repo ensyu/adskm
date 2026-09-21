@@ -642,6 +642,14 @@ Rejection: Any ID not matching format
 **Path Traversal Prevention (CRITICAL):**
 - Reject any ID containing: `..`, `./`, `~`, symlinks, path separators (`\`, `/`)
 - Implementation: Normalize paths using `pathlib.Path.resolve()`
+- Symlink detection (mandatory): After resolve(), iterate through path components to detect symlinks
+  ```python
+  import pathlib
+  resolved_path = pathlib.Path(knowledge_id).resolve()
+  for part in resolved_path.parts:
+    if pathlib.Path(part).is_symlink():
+      raise ValueError('Path contains symlink; rejected')
+  ```
 - Validation: Confirm all file operations stay within `knowledge/` directory
 - Cross-platform: Works on Windows + Unix/Linux
 
@@ -662,8 +670,12 @@ Rejection: Any ID not matching format
 
 **String Sanitization:**
 - Remove control characters (0x00–0x1F except `\n`, `\t`, `\r`)
+  - Implementation: Strip bytes in range [0x00-0x08, 0x0B-0x0C, 0x0E-0x1F]
 - Encoding: UTF-8 only; reject invalid UTF-8 sequences
+  - Implementation: Use `str.encode('utf-8', errors='strict')` to detect invalid sequences
+  - Raise error if invalid UTF-8 found; do not save partial records
 - Whitespace: Normalize CRLF to LF; trim leading/trailing spaces
+  - Implementation: `text.replace('\r\n', '\n').strip()`
 
 **Implementation:**
 ```python
@@ -701,30 +713,89 @@ class KnowledgeRecord(BaseModel):
 
 2. **Concurrency Control (MANDATORY):**
 
+   **Audit Log Format (YAML Stream):**
+   - Multiple entries stored as YAML stream (one entry per append)
+   - Each entry prefixed with YAML stream separator: `---\n`
+   - Single `audit_entry` object serialized (not wrapped in list)
+   - Example file structure:
+     ```yaml
+     ---
+     timestamp: "2026-09-22T14:30:00Z"
+     change_id: "AUD-001"
+     who: "reviewer_name"
+     action: "approve"
+     ...
+     ---
+     timestamp: "2026-09-22T14:31:00Z"
+     change_id: "AUD-002"
+     who: "another_reviewer"
+     action: "update"
+     ...
+     ```
+   - Reader: Split on `---` lines, parse each block as separate YAML document
+
+   **Lock Failure Handling (CRITICAL):**
+   - If lock acquisition fails: Retry with exponential backoff
+   - Retry strategy: Up to 5 attempts with 100ms, 200ms, 400ms, 800ms, 1600ms delays
+   - After all retries exhausted: Raise `AuditWriteError` (critical failure)
+   - **NEVER proceed without lock:** Audit trail integrity is non-negotiable
+   - Operator notification: Alert on lock acquisition timeout
+   - Knowledge operation rollback: Revert any state changes if audit write fails
+
    **Unix/Linux (fcntl-based):**
    ```python
    import fcntl
+   import time
 
    def append_audit_entry(entry):
-     with open(audit_file_path, 'a') as f:
-       fcntl.flock(f.fileno(), fcntl.LOCK_EX)  # Exclusive lock
+     max_retries = 5
+     backoff_ms = [100, 200, 400, 800, 1600]
+
+     for attempt in range(max_retries):
        try:
-         yaml.safe_dump([entry], f, append=True)
-       finally:
-         fcntl.flock(f.fileno(), fcntl.LOCK_UN)  # Unlock
+         with open(audit_file_path, 'a') as f:
+           fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)  # Non-blocking
+           try:
+             # Write YAML stream separator on new line
+             f.write('---\n')
+             # Write single audit entry (not list)
+             yaml.safe_dump(entry, f, default_flow_style=False)
+           finally:
+             fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+         return  # Success
+       except IOError as e:
+         if attempt < max_retries - 1:
+           time.sleep(backoff_ms[attempt] / 1000.0)
+         else:
+           raise AuditWriteError(f"Failed to acquire audit lock after {max_retries} retries")
    ```
 
    **Windows (LockFile API):**
    ```python
    import msvcrt
+   import time
 
    def append_audit_entry(entry):
-     with open(audit_file_path, 'a') as f:
-       msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+     max_retries = 5
+     backoff_ms = [100, 200, 400, 800, 1600]
+
+     for attempt in range(max_retries):
        try:
-         yaml.safe_dump([entry], f, append=True)
-       finally:
-         msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+         with open(audit_file_path, 'a') as f:
+           msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)  # Non-blocking
+           try:
+             # Write YAML stream separator on new line
+             f.write('---\n')
+             # Write single audit entry (not list)
+             yaml.safe_dump(entry, f, default_flow_style=False)
+           finally:
+             msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+         return  # Success
+       except OSError as e:
+         if attempt < max_retries - 1:
+           time.sleep(backoff_ms[attempt] / 1000.0)
+         else:
+           raise AuditWriteError(f"Failed to acquire audit lock after {max_retries} retries")
    ```
 
 3. **Mutex-based In-Memory Locking:**
@@ -732,13 +803,50 @@ class KnowledgeRecord(BaseModel):
    - Per-audit-file mutex; prevents race conditions
    - Implementation: `threading.Lock` (single-process) or `multiprocessing.Lock` (multi-process)
 
-4. **Read Access Control:**
+4. **File Rotation Process (MANDATORY):**
+
+   **Rotation Trigger:**
+   - Rotate audit log when file size exceeds 10 MB
+   - Check size before write: If current size >= 10 MB, rotate before appending
+   - Prevents unbounded log growth while maintaining immutability
+
+   **Rotation Procedure:**
+   1. Close current audit log file
+   2. Rename to archive: `knowledge/audit_logs/archive/AUD_YYYYMMDD_HHMMSS.yaml`
+   3. Set permissions to 444 (r--r--r--)
+   4. Create new audit log file (same base name)
+   5. Append entry to new file
+
+   **Implementation:**
+   ```python
+   def append_audit_entry(entry):
+     # Check if rotation needed
+     if os.path.getsize(audit_file_path) >= 10_000_000:  # 10 MB
+       rotate_audit_log()
+
+     # Proceed with locking and append (as per lock strategy above)
+     ...
+
+   def rotate_audit_log():
+     timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+     archive_path = f"knowledge/audit_logs/archive/AUD_{timestamp}.yaml"
+     os.makedirs(os.path.dirname(archive_path), exist_ok=True)
+     os.rename(audit_file_path, archive_path)
+     os.chmod(archive_path, 0o444)  # Read-only
+   ```
+
+   **Access Control:**
+   - Archived audit files: Read-only (444 permissions)
+   - No delete permission: Archival is permanent
+   - Access: Approval Authority + Auditors only
+
+5. **Read Access Control:**
    - Always consult most recent file state
    - Audit logs: Read-only after append
    - Access: Approval Authority + Auditors only
    - No permission to delete or modify audit entries
 
-5. **Access Control Matrix:**
+6. **Access Control Matrix:**
    ```yaml
    audit_logs/ permissions:
      - Owner: deployment service account
@@ -746,6 +854,13 @@ class KnowledgeRecord(BaseModel):
      - Append: Only audit_service.append() can write
      - Read: Approval Authority + Auditors only
      - Delete: NEVER (audit trail immutable)
+
+   audit_logs/archive/ permissions:
+     - Owner: deployment service account
+     - Permissions: 444 (r--r--r--) per file
+     - Append: NEVER (archived, immutable)
+     - Read: Approval Authority + Auditors only
+     - Delete: NEVER (permanent archival)
    ```
 
 **Post-MVP: Cryptographic Ledger (Q1 2027 Target)**

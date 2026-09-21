@@ -260,7 +260,7 @@ draft
 - Cannot be modified by projects
 - Immutable once approved
 
-### Project Override (`knowledge/overrides/`)
+### Project Override (`knowledge/overrides/<project_id>/`)
 - **Project-specific exceptions**
 - **Ownership:** Project team
 - **Change Control:** Project-level approval
@@ -276,13 +276,100 @@ draft
 **Example:**
 ```
 Master (Company Standard):
-  - Standard foundation reinforcement spacing
+  - Standard foundation reinforcement spacing: 200mm
   
 Project Override (Current Project Exception):
-  - Site-specific soil condition requires tighter spacing
+  - Project X site-specific soil condition requires tighter spacing: 150mm
   - Valid for Project X only
   - Does not change company standard
 ```
+
+### Master/Override Composition Logic (Runtime)
+
+**How the system loads and applies knowledge with overrides:**
+
+```yaml
+# Composition Algorithm
+function get_knowledge(knowledge_id, project_id=null):
+  
+  # 1. Load Master record (always)
+  master = load("knowledge/master/{knowledge_id}.yaml")
+  
+  # 2. Check for Project Override
+  if project_id:
+    override_path = "knowledge/overrides/{project_id}/{knowledge_id}.yaml"
+    if file_exists(override_path):
+      override = load(override_path)
+    else:
+      override = null
+  else:
+    override = null
+  
+  # 3. Apply Composition Logic
+  if override:
+    return compose(master, override, mode="OVERRIDE_PRECEDENCE")
+  else:
+    return master
+
+function compose(master, override, mode="OVERRIDE_PRECEDENCE"):
+  # Mode: OVERRIDE_PRECEDENCE
+  # - Override requirements REPLACE master requirements (stricter or different)
+  # - Override checks REPLACE master checks
+  # - Override evidence is separate from master evidence
+  # - Override source tracking independent from master
+  
+  result = {
+    metadata: merge_metadata(master.metadata, override.metadata),
+    content: {
+      title: override.content.title OR master.content.title,
+      summary: override.content.summary OR master.content.summary,
+      requirements: override.content.requirements OR master.content.requirements,
+      checks: override.content.checks OR master.content.checks,
+    },
+    source: {
+      master_sources: master.source.sources,    # Preserved for reference
+      override_sources: override.source.sources, # Project-specific evidence
+      applied_source_type: override.source.primary_source_type,
+      evidence_sufficiency: override.source.evidence_sufficiency,
+    },
+    approval: {
+      master_approval: master.approval,      # Preserved for reference
+      override_approval: override.approval,  # Project approval chain
+      effective_approval: override.approval, # Override is operationally effective
+    },
+  }
+  return result
+```
+
+**Composition Example:**
+```yaml
+# Master: KNW-W01-FND-001 (Foundation Reinforcement Standard)
+content:
+  requirements:
+    - Reinforcement spacing: 200mm centers
+    - Bar diameter: D13 minimum
+    - Concrete cover: 50mm
+
+# Project Override: Project_X/KNW-W01-FND-001
+content:
+  requirements:
+    - Reinforcement spacing: 150mm centers (site-specific soil)
+    - Bar diameter: D13 minimum (unchanged)
+    - Concrete cover: 50mm (unchanged)
+
+# Composed Result (for Project X):
+content:
+  requirements:
+    - Reinforcement spacing: 150mm centers ← override applied
+    - Bar diameter: D13 minimum           ← master value used (no override)
+    - Concrete cover: 50mm              ← master value used (no override)
+```
+
+**Access Control for Composition:**
+- `load_master()` — Read-only, no project ID required
+- `load_override(knowledge_id, project_id)` — Accessible only to project members
+- `compose()` — Automated; no approval gate
+- Result visibility: Master always readable; Override + Composition available only within project context
 
 ---
 
@@ -321,7 +408,46 @@ Project Override (Current Project Exception):
 | Reviewer B | Implementation quality | No |
 | Reviewer C | Evidence quality | No |
 | Security Officer | Data/Knowledge security | Yes/No (escalate if concern) |
+| Field Supervisor | field_record validation & authenticity | No (escalates to Approval Authority) |
 | Approval Authority | Final knowledge approval | **Yes** |
+
+**Field Supervisor Role Details:**
+- Validates that field_record observations are authentic and representative
+- Ensures observation metadata is complete (date, location, conditions, observer credentials)
+- Reviews observation for potential bias or non-typical conditions
+- Escalates disputes (field observation vs. general_practice contradiction) to Approval Authority
+
+### Evidence Exception Framework
+
+**When knowledge has insufficient evidence but operational need exists:**
+
+**Criteria for Evidence Exception Request:**
+- `evidence_sufficiency: insufficient` AND
+- Operational or safety need documented AND
+- All available sources cited (cannot do better with current resources) AND
+- Risk assessment provided
+
+**Approval Process:**
+1. Knowledge creator documents exception request in `evidence_notes` field
+2. Reviewer C (Evidence Quality) flags as insufficient
+3. Knowledge moves to `review_required` status (explicit)
+4. Approval Authority receives exception request with risk assessment
+5. Approval Authority decision: `approved_with_exception` OR `rejected`
+   - If approved: Requires explicit approval comment documenting risk acceptance
+   - If rejected: Knowledge returns to draft for evidence collection
+
+**Example Exception Case:**
+```yaml
+Knowledge: KNW-W01-FND-001
+evidence_sufficiency: insufficient
+evidence_notes: |
+  Only one source available: company standard from 2020.
+  No current MLIT regulation found.
+  Site supervisor confirms practice matches observed field conditions.
+  Risk: Guideline may be outdated; recommend 1-year review cycle.
+approval_comment: "Approved with documented risk: May require update when MLIT 2026 
+  standard released. Interim reliance on field validation acceptable. Review by 2027-09-01."
+```
 
 ---
 
@@ -337,6 +463,26 @@ Project Override (Current Project Exception):
 - Audit log (detect unauthorized changes)
 - Human approval gate (final human oversight)
 
+**Operational Safeguards:**
+
+1. **AI Hallucination Detection**
+   - Reviewer C (Evidence Quality) verifies that AI-structured sources actually match claimed source documents
+   - Requirement: Source verification step must cite specific page/section of claimed source
+   - If unverifiable: Confidence level marked as "low" or rejected
+
+2. **Field Record Validation**
+   - Field Supervisor reviews field_record observations for authenticity
+   - Checks: observation date, location, conditions, observer credentials
+   - Flags: potentially biased observations, non-typical conditions
+   - Escalation: If field_record contradicts general_practice → USER_DECISION_REQUIRED
+
+3. **Knowledge Aging Review**
+   - Automated: Audit log provides age tracking (created_at, last_updated_at)
+   - Manual frequency: All company_standard records reviewed annually minimum
+   - Triggers: Source version change, regulation update, risk level increase
+   - Owner: Knowledge Steward role (assigned ownership required)
+   - Decision: Supersede, refresh evidence, or keep current
+
 ### Evidence Integrity
 **Threat:** Evidence becomes invalid (link breaks, version changes, removed source)
 
@@ -347,6 +493,27 @@ Project Override (Current Project Exception):
 - Alert on broken links
 - Maintain source archive (future)
 
+**Operational Implementation:**
+
+1. **Source Location Verification**
+   - Implementation: URL validation (HTTP/HTTPS scheme, accessible)
+   - Frequency: At creation time; optional periodic re-verification
+   - Failure handling: Log as warning; mark evidence_sufficiency as "insufficient" if critical source inaccessible
+
+2. **Broken Source Handling**
+   - Detection: Manual (Audit log review) or future automated (link checker)
+   - Procedure: When approved knowledge has broken source:
+     - Create superseding record with updated sources
+     - Mark original as "evidence_compromised"
+     - Notify affected projects using this knowledge
+     - Requires re-approval of superseded knowledge
+   - Recovery: Source archive (post-MVP) enables historical evidence preservation
+
+3. **Evidence Replacement Control**
+   - Policy: Changing source evidence triggers notification to prior reviewers
+   - Contradiction detection: If new evidence contradicts prior evidence → escalate to Reviewer C
+   - Re-approval: Evidence-only changes do NOT require full review if contradiction absent; audit-logged as "evidence_update"
+
 ### Approval Contamination
 **Threat:** Unapproved knowledge accidentally appears approved
 
@@ -356,6 +523,25 @@ Project Override (Current Project Exception):
 - No batch approvals without review
 - Audit log of all approvals
 - Separate draft/approved storage
+
+**Operational Implementation:**
+
+1. **Access Control Enforcement**
+   - Master knowledge: File permissions read-only after approval (chmod 444)
+   - Draft knowledge: Readable only to creator/assigned reviewers
+   - Override knowledge: Accessible only to project members
+   - Implementation: Service layer validates access before load/save
+
+2. **Approval Metadata Integrity**
+   - Audit log: Append-only YAML files (no retroactive modification)
+   - Future: Immutable ledger with cryptographic hashing
+   - Requirement: Approval records include timestamp, approver ID, approval_comment
+   - Cryptographic verification deferred post-MVP; documented in DEVELOPMENT.md
+
+3. **Unapproved Knowledge Operational Use Prevention**
+   - Technical boundary: `load_master()` returns only approved records
+   - Draft/Override knowledge not returned by default
+   - Explicit opt-in required: `load_draft(knowledge_id, project_id)` for project-level access
 
 ### Typical Security Concerns (Also Assessed)
 - Data leakage (Confidential project info)
@@ -403,7 +589,275 @@ audit_entry:
 
 ---
 
-## 10. System Architecture (Code)
+## 10. Operational & Implementation Details
+
+### 10.1 Versioning Policy
+
+**Version Numbering: Semantic Versioning (MAJOR.MINOR.PATCH)**
+
+When to increment:
+
+```yaml
+MAJOR version:
+  - Knowledge requirement structure fundamentally changes (requirement added/removed)
+  - Approval status transitions to superseded (knowledge wholly replaced)
+  - Scope changes (master ↔ project_override)
+  
+MINOR version:
+  - Evidence updated (sources added/changed/removed)
+  - evidence_sufficiency changes (insufficient → sufficient)
+  - Source version changes (e.g., regulation updated)
+  - confidence_level changes across sources
+  
+PATCH version:
+  - Metadata-only changes (approval_comment, title refinement)
+  - status changes (draft → review_required)
+  - Non-content field updates (knowledge_type, risk_level adjustment)
+```
+
+**Implementation:** Audit log `new_version` field increments automatically; creator/reviewer cannot manually override.
+
+### 10.2 Error Handling & Recovery
+
+**YAML Parse Failures**
+- Symptom: Malformed YAML syntax in knowledge files
+- Response: Log error with file path and line number; skip file; continue processing others
+- Recovery: Manual human intervention required; file moved to `knowledge/corrupted/` for review
+- Alert: Operator notification for manual remediation
+
+**Pydantic Validation Failures**
+- Symptom: Required field missing, type mismatch, enum value invalid
+- Response: Return detailed field-level errors to creator/reviewer
+- Recovery: Prevent save to master/; allow save to drafts/ for revision with error details
+- Decision: Require explicit error correction before re-submission
+
+**Audit Log Write Failures**
+- Symptom: Cannot append to audit log file (permissions, disk full, I/O error)
+- Response: **CRITICAL** — do not finalize knowledge save; rollback transaction
+- Recovery: Rollback knowledge record to previous state; raise alert to operator
+- Rationale: Audit trail integrity is non-negotiable
+
+**Source Accessibility Failures**
+- Symptom: URL unreachable, file path invalid, source not found
+- Response: Log as warning in evidence_notes; do NOT block knowledge creation
+- Recovery: Manual decision to proceed with insufficient evidence or locate alternative source
+- Escalation: If critical source inaccessible → Evidence Exception pathway (Section 7)
+
+**Broken Source in Approved Knowledge**
+- Symptom: Periodic verification detects source link now broken
+- Response: Trigger knowledge review; create superseding record with updated sources
+- Recovery: Previous knowledge marked as "evidence_compromised"; manual decision to update or retire
+- Notification: Alert all projects using this knowledge
+
+### 10.3 Access Control Model
+
+**File-level Permissions (Filesystem)**
+
+```yaml
+knowledge/master/
+  - Owner: deployment service account
+  - Permissions: 550 (rwxr-x---)
+  - File permission after approval: 440 (r--r-----)
+  - Write-protect once approved: immutable in operational use
+
+knowledge/overrides/<project_id>/
+  - Owner: project service account
+  - Permissions: 770 (rwxrwx---)
+  - Readable by: project team members
+  - Not readable by: other projects, general public
+
+knowledge/drafts/
+  - Owner: creator/assigned reviewer
+  - Permissions: 600 (rw-------)
+  - Accessible only to: creator, assigned reviewers
+
+knowledge/audit_logs/
+  - Owner: deployment service account
+  - Permissions: 444 (r--r--r--)
+  - Append-only: locking mechanism prevents concurrent writes
+```
+
+**Service-layer Access Control**
+
+```python
+# Pseudocode for KnowledgeService access checks
+
+def load_master(knowledge_id):
+  # Always allowed; read-only access to approved master knowledge
+  validate_knowledge_id_format(knowledge_id)
+  return read_file(f"knowledge/master/{knowledge_id}.yaml")
+
+def load_draft(knowledge_id, user_id):
+  # Restricted: creator and assigned reviewers only
+  draft = read_file(f"knowledge/drafts/{knowledge_id}.yaml")
+  if draft.created_by != user_id and user_id not in draft.assigned_reviewers:
+    raise AccessDenied("Not authorized to view draft knowledge")
+  return draft
+
+def load_override(knowledge_id, project_id, user_id):
+  # Restricted: project members only
+  if not is_project_member(project_id, user_id):
+    raise AccessDenied("Not authorized to access project overrides")
+  return read_file(f"knowledge/overrides/{project_id}/{knowledge_id}.yaml")
+
+def save_master(knowledge_record, approver_id):
+  # Restricted: Approval Authority only; triggers immutability
+  if not has_approval_authority(approver_id):
+    raise AccessDenied("Insufficient authorization to approve knowledge")
+  write_file(f"knowledge/master/{knowledge_record.id}.yaml", knowledge_record)
+  set_file_immutable(f"knowledge/master/{knowledge_record.id}.yaml")
+```
+
+### 10.4 Interaction Model (MVP Limitation)
+
+**Current State:** No CLI/Web UI in MVP
+
+**Workaround for MVP:**
+- Knowledge creation/approval conducted via Python scripts + manual YAML editing
+- Test case: Demonstrate full workflow with KNW-W01-FND-001 example record
+- Assumption: MVP operators are technically capable (engineers, not construction workers)
+
+**Post-MVP Requirement:**
+- CLI interface (minimal viable): `adskm knowledge register`, `adskm knowledge approve`
+- Web UI (future): Project dashboard, knowledge search, approval workflow UI
+
+---
+
+## 11. System Architecture (Code)
+
+### 10.1 Versioning Policy
+
+**Version Numbering: Semantic Versioning (MAJOR.MINOR.PATCH)**
+
+When to increment:
+
+```yaml
+MAJOR version:
+  - Knowledge requirement structure fundamentally changes (requirement added/removed)
+  - Approval status transitions to superseded (knowledge wholly replaced)
+  - Scope changes (master ↔ project_override)
+  
+MINOR version:
+  - Evidence updated (sources added/changed/removed)
+  - evidence_sufficiency changes (insufficient → sufficient)
+  - Source version changes (e.g., regulation updated)
+  - confidence_level changes across sources
+  
+PATCH version:
+  - Metadata-only changes (approval_comment, title refinement)
+  - status changes (draft → review_required)
+  - Non-content field updates (knowledge_type, risk_level adjustment)
+```
+
+**Implementation:** Audit log `new_version` field increments automatically; creator/reviewer cannot manually override.
+
+### 10.2 Error Handling & Recovery
+
+**YAML Parse Failures**
+- Symptom: Malformed YAML syntax in knowledge files
+- Response: Log error with file path and line number; skip file; continue processing others
+- Recovery: Manual human intervention required; file moved to `knowledge/corrupted/` for review
+- Alert: Operator notification for manual remediation
+
+**Pydantic Validation Failures**
+- Symptom: Required field missing, type mismatch, enum value invalid
+- Response: Return detailed field-level errors to creator/reviewer
+- Recovery: Prevent save to master/; allow save to drafts/ for revision with error details
+- Decision: Require explicit error correction before re-submission
+
+**Audit Log Write Failures**
+- Symptom: Cannot append to audit log file (permissions, disk full, I/O error)
+- Response: **CRITICAL** — do not finalize knowledge save; rollback transaction
+- Recovery: Rollback knowledge record to previous state; raise alert to operator
+- Rationale: Audit trail integrity is non-negotiable
+
+**Source Accessibility Failures**
+- Symptom: URL unreachable, file path invalid, source not found
+- Response: Log as warning in evidence_notes; do NOT block knowledge creation
+- Recovery: Manual decision to proceed with insufficient evidence or locate alternative source
+- Escalation: If critical source inaccessible → Evidence Exception pathway (Section 7)
+
+**Broken Source in Approved Knowledge**
+- Symptom: Periodic verification detects source link now broken
+- Response: Trigger knowledge review; create superseding record with updated sources
+- Recovery: Previous knowledge marked as "evidence_compromised"; manual decision to update or retire
+- Notification: Alert all projects using this knowledge
+
+### 10.3 Access Control Model
+
+**File-level Permissions (Filesystem)**
+
+```yaml
+knowledge/master/
+  - Owner: deployment service account
+  - Permissions: 550 (rwxr-x---)
+  - File permission after approval: 440 (r--r-----)
+  - Write-protect once approved: immutable in operational use
+
+knowledge/overrides/<project_id>/
+  - Owner: project service account
+  - Permissions: 770 (rwxrwx---)
+  - Readable by: project team members
+  - Not readable by: other projects, general public
+
+knowledge/drafts/
+  - Owner: creator/assigned reviewer
+  - Permissions: 600 (rw-------)
+  - Accessible only to: creator, assigned reviewers
+
+knowledge/audit_logs/
+  - Owner: deployment service account
+  - Permissions: 444 (r--r--r--)
+  - Append-only: locking mechanism prevents concurrent writes
+```
+
+**Service-layer Access Control**
+
+```python
+# Pseudocode for KnowledgeService access checks
+
+def load_master(knowledge_id):
+  # Always allowed; read-only access to approved master knowledge
+  validate_knowledge_id_format(knowledge_id)
+  return read_file(f"knowledge/master/{knowledge_id}.yaml")
+
+def load_draft(knowledge_id, user_id):
+  # Restricted: creator and assigned reviewers only
+  draft = read_file(f"knowledge/drafts/{knowledge_id}.yaml")
+  if draft.created_by != user_id and user_id not in draft.assigned_reviewers:
+    raise AccessDenied("Not authorized to view draft knowledge")
+  return draft
+
+def load_override(knowledge_id, project_id, user_id):
+  # Restricted: project members only
+  if not is_project_member(project_id, user_id):
+    raise AccessDenied("Not authorized to access project overrides")
+  return read_file(f"knowledge/overrides/{project_id}/{knowledge_id}.yaml")
+
+def save_master(knowledge_record, approver_id):
+  # Restricted: Approval Authority only; triggers immutability
+  if not has_approval_authority(approver_id):
+    raise AccessDenied("Insufficient authorization to approve knowledge")
+  write_file(f"knowledge/master/{knowledge_record.id}.yaml", knowledge_record)
+  set_file_immutable(f"knowledge/master/{knowledge_record.id}.yaml")
+```
+
+### 10.4 Interaction Model (MVP Limitation)
+
+**Current State:** No CLI/Web UI in MVP
+
+**Workaround for MVP:**
+- Knowledge creation/approval conducted via Python scripts + manual YAML editing
+- Test case: Demonstrate full workflow with KNW-W01-FND-001 example record
+- Assumption: MVP operators are technically capable (engineers, not construction workers)
+
+**Post-MVP Requirement:**
+- CLI interface (minimal viable): `adskm knowledge register`, `adskm knowledge approve`
+- Web UI (future): Project dashboard, knowledge search, approval workflow UI
+
+---
+
+## 11. System Architecture (Code)
 
 ### Directory Structure
 ```
@@ -461,7 +915,7 @@ adskm/
 
 ---
 
-## 11. Development Flow (ADS v4.2 Autonomous Model)
+## 12. Development Flow (ADS v4.2 Autonomous Model)
 
 ADSKM follows official ADS v4.2.0 standard with autonomous execution:
 
@@ -508,6 +962,58 @@ Released
    - External/irreversible: Formal release, production deployment, real-world impact
    - Requires explicit human authorization before proceeding
 
+### USER_DECISION_REQUIRED Mapping (Detailed)
+
+**Explicit triggers requiring human business decision:**
+
+```yaml
+USER_DECISION_REQUIRED Triggers:
+
+1. Company Standard Adoption
+   - When: Knowledge is promoted from general_practice to company_standard
+   - Who: Manager/Director approval authority
+   - Decision: "Is this industry practice appropriate for our company standard?"
+   - Escalation: Risk-weighted (low-risk → fast-track, high-risk → executive review)
+
+2. Evidence Exceptions
+   - When: Knowledge has insufficient evidence but operational need exists
+   - Who: Approval authority + Risk officer sign-off
+   - Decision: "Accept evidence gap? Required safety justification?"
+   - Threshold: Evidence_sufficiency = insufficient + risk_level >= high
+
+3. Project Override → Master Promotion
+   - When: Proven project override has company-wide value
+   - Who: Manager + Approval authority
+   - Decision: "Should this project exception become company standard?"
+   - Example: Site-specific soil condition → becomes foundation standard
+
+4. High-Risk Knowledge Adoption
+   - When: risk_level = critical OR risk_level = high + novel_knowledge
+   - Who: Director/Technical authority + Risk/Safety officer
+   - Decision: "Approve high-risk knowledge? Mitigation plan?"
+   - Documentation: Requires signed approval comment + risk assessment
+
+5. Conflicting Evidence Sources
+   - When: Multiple sources provide contradictory requirements
+   - Who: Subject matter expert + Approval authority
+   - Decision: "Which source precedence? Why? Reconciliation approach?"
+   - Escalation: Cannot auto-resolve; requires expert judgment
+
+6. General Practice → Field Record Dispute
+   - When: field_record contradicts accepted general_practice
+   - Who: Supervisor + Field expert + Approval authority
+   - Decision: "Update standard based on field observation?"
+   - Rationale: Prevents AI from over-weighting single observations
+```
+
+**Non-triggers (Auto-processed by HEAD AGENT):**
+- Evidence collection and structuring ✅
+- Source validation and classification ✅
+- Independent review findings ✅
+- Security gate remediation ✅
+- YAML format and schema compliance ✅
+- Versioning and audit logging ✅
+
 ### Independent Review (Sub-Agent based)
 
 All reviews use **isolated Sub-Agent contexts within single conversation:**
@@ -522,7 +1028,7 @@ All reviews use **isolated Sub-Agent contexts within single conversation:**
 
 ---
 
-## 12. Initial MVP Implementation
+## 13. Initial MVP Implementation
 
 ### Phase 1: Schema & Models
 ```
@@ -568,7 +1074,7 @@ All reviews use **isolated Sub-Agent contexts within single conversation:**
 
 ---
 
-## 13. Testing Strategy
+## 14. Testing Strategy
 
 ### Unit Tests
 - Model validation
@@ -592,7 +1098,7 @@ All reviews use **isolated Sub-Agent contexts within single conversation:**
 
 ---
 
-## 14. ADS v4.2 Compliance
+## 15. ADS v4.2 Compliance
 
 This specification adopts official ADS v4.2.0 standard:
 
@@ -621,7 +1127,7 @@ ONE REQUEST. ONE CONVERSATION. AUTONOMOUS EXECUTION TO TRIAL-READY.
 
 ---
 
-## 15. Success Criteria
+## 16. Success Criteria
 
 ### MVP Success
 - [ ] APP-SPEC.md approved
@@ -645,7 +1151,7 @@ ONE REQUEST. ONE CONVERSATION. AUTONOMOUS EXECUTION TO TRIAL-READY.
 
 ---
 
-## 15.1 MVP Constraints (Intentional)
+## 16.1 MVP Constraints (Intentional)
 
 The following limitations are **intentional MVP design decisions**, not oversight:
 
@@ -669,7 +1175,7 @@ The following limitations are **intentional MVP design decisions**, not oversigh
 
 ---
 
-## 16. Next Actions (ADS v4.2 Autonomous Model)
+## 17. Next Actions (ADS v4.2 Autonomous Model)
 
 Following ADS v4.2 standard, next steps are automated under HEAD AGENT orchestration:
 
@@ -716,7 +1222,7 @@ Following ADS v4.2 standard, next steps are automated under HEAD AGENT orchestra
 
 ---
 
-## 17. Document References
+## 18. Document References
 
 - **ADSKM-OVERVIEW.md** - High-level system overview
 - **KNOWLEDGE-SCHEMA.md** - Detailed schema specifications
